@@ -34,6 +34,7 @@ class BaseUserGroup(models.Model):
         super(BaseUserGroup, self).save(*args, **kwargs)
         if created:
             self.admins.add(self.user)
+            self.user.add(self.user)
 
 
 class UserGroupApplication(models.Model):
