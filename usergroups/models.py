@@ -61,7 +61,6 @@ class UserGroupInvitation(models.Model):
             self.secret_key = self.generate_secret_key()
         super(UserGroupInvitation, self).save(*args, **kwargs)
         
-    
 
 # First test if a custom usergroup model has been supplied. If not, create a
 # subclass of BaseUserGroup.
