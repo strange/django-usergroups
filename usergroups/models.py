@@ -1,9 +1,13 @@
 import datetime
+import random
+import sha
 
 from django.db import models
 from django.db.models import get_model
 from django.contrib.auth.models import User
 from django.conf import settings
+
+from usergroups.managers import UserGroupInvitationManager
 
 class BaseUserGroup(models.Model):
     """An abstract base class for a group of people; an association."""
@@ -43,6 +47,20 @@ class UserGroupInvitation(models.Model):
     user = models.ForeignKey(User)
     usergroup = models.ForeignKey('UserGroup')
     secret_key = models.CharField(max_length=30)
+    
+    objects = UserGroupInvitationManager
+    
+    def generate_secret_key(self):
+        """Generate a secret key."""
+        # Stolen from James Bennet! Oh my!
+        salt = sha.new(str(random.random())).hexdigest()[:5]
+        return sha.new(salt + user.username).hexdigest()
+    
+    def save(self, *args, **kwargs):
+        if self.secret_key is None:
+            self.secret_key = self.generate_secret_key()
+        super(UserGroupInvitation, self).save(*args, **kwargs)
+        
     
 
 # First test if a custom usergroup model has been supplied. If not, create a
