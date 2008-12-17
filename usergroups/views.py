@@ -24,6 +24,14 @@ def group_detail(request, group_slug):
 # Create, edit delete views
 
 def create_group(request, form_class=UserGroupForm):
+    """Create a new user group. The requesting user will be set as the
+    creator (and subsequently an admin in the underlying interface).
+    
+    A custom form can be supplied via the ``form_class`` argument. The form
+    will be fed a newly created group instance in which the creator field has
+    been set. The form's ``is_valid()`` method will be called prior to save.
+    
+    """
     group = UserGroup(creator=request.user)
     
     if request.method == "POST":
@@ -37,6 +45,13 @@ def create_group(request, form_class=UserGroupForm):
 
 @group_admin_required
 def edit_group(request, group, group_slug, form_class=UserGroupForm):
+    """Edit an existing user group.
+    
+    A custom form can be supplied via the ``form_class`` argument. The form
+    will be fed an existing group instance and the form's ``is_valid()``
+    method will be called prior to save.
+    
+    """
     if request.method == "POST":
         form = form_class(request.POST, instance=group)
         if form.is_valid():
@@ -48,7 +63,12 @@ def edit_group(request, group, group_slug, form_class=UserGroupForm):
 
 @group_admin_required
 def delete_group(request, group, group_slug):
-    pass
+    """Delete group."""
+    group_name = group.name
+    group.delete()
+    return simple.direct_to_template(request,
+                                     extra_context={ 'group_name': group_name },
+                                     template='usergroups/group_form.html')
 
 # Group administration views
 
