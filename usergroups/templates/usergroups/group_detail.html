@@ -1,0 +1,12 @@
+<h1>{{ group.name }}</h1>
+
+<h2>Admins</h2>
+{% for admin in group.admins.all %}
+    {{ admin.get_full_name }}
+{% endfor %}
+
+<h2>Members</h2>
+{% for member in group.members.all %}
+    {{ member.get_full_name }}
+{% endfor %}
+

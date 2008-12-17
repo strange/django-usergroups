@@ -6,6 +6,7 @@ from django.db import models
 from django.db.models import get_model
 from django.contrib.auth.models import User
 from django.conf import settings
+from django.core.urlresolvers import reverse
 
 from usergroups.managers import UserGroupInvitationManager
 
@@ -27,14 +28,21 @@ class BaseUserGroup(models.Model):
         """Test if supplied user is an admin of group."""
         return user in self.admins
     
+    @models.permalink
+    def get_absolute_url(self):
+        return ('usergroups.views.group_detail', (), { 'group_id': self.id })
+    
     def save(self, *args, **kwargs):
         created = False
         if not self.pk:
             created = True
         super(BaseUserGroup, self).save(*args, **kwargs)
         if created:
-            self.admins.add(self.user)
-            self.user.add(self.user)
+            self.admins.add(self.creator)
+            self.members.add(self.creator)
+    
+    class Meta:
+        abstract = True
 
 
 class UserGroupApplication(models.Model):
@@ -49,7 +57,7 @@ class UserGroupInvitation(models.Model):
     usergroup = models.ForeignKey('UserGroup')
     secret_key = models.CharField(max_length=30)
     
-    objects = UserGroupInvitationManager
+    objects = UserGroupInvitationManager()
     
     def generate_secret_key(self):
         """Generate a secret key."""

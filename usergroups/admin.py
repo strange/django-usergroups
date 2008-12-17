@@ -1,4 +1,4 @@
-from organizations.models import Organization
+from usergroups.models import UserGroup
 from django.contrib import admin
-admin.site.register(Organization)
+admin.site.register(UserGroup)
 
