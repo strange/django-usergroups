@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Organizations{% endblock %}
+
+{% block content %}
+<h1>User Groups</h1>
+{% if group_list.count %}
+<ul>
+{% for group in group_list %}
+    <li><a href="{{ group.get_absolute_url }}">{{ group.name }}</a></li>
+{% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

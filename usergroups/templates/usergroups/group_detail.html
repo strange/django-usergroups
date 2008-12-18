@@ -1,12 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Organization: {{ group.name }}{% endblock %}
+
+{% block content %}
 <h1>{{ group.name }}</h1>
 
+{% if is_admin %}
+<h2>Applications</h2>
+{% if group.usergroupapplication_set.count %}
+<ul>
+    {% for application in group.usergroupapplication_set.all %}
+    <li>{{ application.user.get_full_name }} <a href="{% url usergroups_approve_application group.id application.id %}">Approve</a></li>
+    {% endfor %}
+</ul>
+{% endif %}
+{% endif %}
+
 <h2>Admins</h2>
-{% for admin in group.admins.all %}
-    {{ admin.get_full_name }}
-{% endfor %}
+{% if group.admins.count %}
+<ul>
+    {% for admin in group.admins.all %}
+    <li>{{ admin.get_full_name }}{% if is_admin %} <a href="{% url usergroups_revoke_admin group.id admin.id %}">Revoke admin privileges</a>{% endif %}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if user.is_authenticated and not is_member %}
+<p><a href="{% url usergroups_apply_to_join group.id %}">Apply to join this group</a></p>
+{% endif %}
 
 <h2>Members</h2>
-{% for member in group.members.all %}
-    {{ member.get_full_name }}
-{% endfor %}
+{% if member_list.count %}
+<ul>
+    {% for member in member_list %}
+    <li>{{ member.get_full_name }}{% if is_admin %} <a href="">Remove from group</a> <a href="{% url usergroups_add_admin group.id member.id %}">Make admin</a>{% endif %}</li>
+    {% endfor %}
+</ul>
+{% endif %}
 
+{% endblock %}

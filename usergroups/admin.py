@@ -1,4 +1,8 @@
-from usergroups.models import UserGroup
 from django.contrib import admin
-admin.site.register(UserGroup)
 
+from usergroups.models import UserGroup
+from usergroups.models import UserGroupApplication
+from usergroups.models import UserGroupInvitation
+
+admin.site.register(UserGroup)
+admin.site.register(UserGroupApplication)

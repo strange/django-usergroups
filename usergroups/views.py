@@ -1,9 +1,12 @@
+import datetime
+
 from django.views.generic import list_detail
 from django.views.generic import simple
 from django.http import HttpResponseRedirect
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 
 from usergroups.models import UserGroup
 from usergroups.models import UserGroupInvitation
@@ -13,15 +16,32 @@ from usergroups.decorators import group_admin_required
 
 # Display views
 
-def group_list(request, queryset=None, extra_context={}):
+def group_list(request, queryset=None, extra_context={}, paginate_by=None):
     if queryset is None:
         queryset = UserGroup.objects.all().select_related()
-    return list_detail.object_list(request, queryset)
+    return list_detail.object_list(request, queryset,
+                                   template_object_name='group',
+                                   extra_context=extra_context,
+                                   paginate_by=paginate_by,
+                                   template_name='usergroups/group_list.html')
 
-def group_detail(request, group_id, extra_context={}):
+def group_detail(request, group_id, extra_context={}, paginate_by=None):
     group = get_object_or_404(UserGroup, pk=group_id)
-    return simple.direct_to_template(request, extra_context=locals(),
-                                     template='usergroups/group_detail.html')
+    
+    queryset = group.members.all()
+    
+    ec = extra_context.copy()
+    is_admin = group.is_admin(request.user)
+    ec.update({
+        'group': group,
+        'is_admin': is_admin,
+        'is_member': is_admin or request.user in group.members.all(),
+    })
+    
+    return list_detail.object_list(request, queryset,
+                                   template_object_name='member',
+                                   extra_context=ec, paginate_by=paginate_by,
+                                   template_name='usergroups/group_detail.html')
 
 # Create, edit delete views
 
@@ -78,8 +98,9 @@ def delete_group(request, group, group_id):
 
 # Group administration views
 
+@login_required
 @group_admin_required
-def add_group_admin(request, group, group_id, user_id):
+def add_admin(request, group, group_id, user_id):
     """Add a user to the list of users with administrative privilegies in a
     group.
     
@@ -88,21 +109,45 @@ def add_group_admin(request, group, group_id, user_id):
     group.admins.add(user)
     
     # The interface should prevent this from ever being needed.
-    if user not in group.users:
-        group.users.add(user)
+    if user not in group.members.all():
+        group.members.add(user)
     return HttpResponseRedirect(group.get_absolute_url())
 
+@login_required
 @group_admin_required
-def remove_group_admin(request, group, group_id, user_id):
-    """Remove a user's administrative privilegies in a group."""
+def revoke_admin(request, group, group_id, user_id):
+    """Revoke an admins's administrative privilegies in a group."""
     user = get_object_or_404(User, pk=user_id)
-    group.admins.remove(user)
+    group.remove_admin(user)
+    return HttpResponseRedirect(group.get_absolute_url())
+
+@login_required
+@group_admin_required
+def remove_member(request, group, group_id, user_id):
+    """Remove a member from the group. Also removes the user from the list
+    of admins if applicable.
+    
+    """
+    user = get_object_or_404(User, pk=user_id)
+    group.remove_admin(user)
+    group.members.remove(user)
+    return HttpResponseRedirect(group.get_absolute_url())
+
+@login_required
+def leave_group(request, group, group_id):
+    """Allow a user to leave a group. Also removes the user from the list
+    of admins if applicable.
+    
+    """
+    group.remove_admin(request.user)
+    group.members.remove(request.user)
     return HttpResponseRedirect(group.get_absolute_url())
 
 # Invitation/application views
 
+@login_required
 @group_admin_required
-def send_group_invitation(request, group, group_id, user_id):
+def invite_user(request, group, group_id, user_id):
     """Create an invitation to a user group for a user."""
     user = get_object_or_404(User, pk=user_id)
     invitation = UserGroupInvitation.objects.create(user=user, group=group)
@@ -121,14 +166,30 @@ def handle_group_invitation(request, group_id, secret_key):
     return simple.direct_to_template(request, extra_context=locals(),
                                      template='groups/invitation.html')
 
+@login_required
 @group_admin_required
-def apply_to_join_group(request, group, group_id):
+def approve_application(request, group, group_id, application_id):
+    """Approv an application"""
+    application = get_object_or_404(UserGroupApplication, pk=application_id)
+    group.members.add(application.user)
+    application.delete()
+    return HttpResponseRedirect(group.get_absolute_url())
+
+@login_required
+def apply_to_join_group(request, group_id):
     """Allow a user to apply to join a user group."""
-    already_member = group.users.filter(user=request.user).count() != 0
+    group = get_object_or_404(UserGroup, pk=group_id)
+    already_member = request.user in group.members.all()
     if not already_member:
-        UserGroupApplication.objects.create(user=request.user, group=group)
-    return simple.direct_to_template(request, extra_context=locals(),
-                                     template='groups/application.html')
-
-# Helpers and decorators.
-
+        try:
+            application = UserGroupApplication.objects.get(user=request.user,
+                                                           group=group)
+            application.created = datetime.datetime.now()
+            application.save()
+        except UserGroupApplication.DoesNotExist:
+            UserGroupApplication.objects.create(user=request.user, group=group)
+    
+    extra_context = { 'group': group, 'already_member': already_member }
+    
+    return simple.direct_to_template(request, extra_context=extra_context,
+                                     template='usergroups/application.html')

@@ -13,7 +13,6 @@ from usergroups.managers import UserGroupInvitationManager
 class BaseUserGroup(models.Model):
     """An abstract base class for a group of people; an association."""
     name = models.CharField(max_length=130)
-    slug = models.SlugField()
 
     info = models.TextField(blank=True)
     website = models.URLField(blank=True)
@@ -24,22 +23,32 @@ class BaseUserGroup(models.Model):
     
     created = models.DateTimeField(default=datetime.datetime.now)
     
-    def user_is_admin(self, user):
-        """Test if supplied user is an admin of group."""
-        return user in self.admins
+    def remove_admin(self, user):
+        """Remove an admin from the group."""
+        self.admins.remove(user)
+        if user == self.creator and self.admins.count():
+            # Assign a random admin to the role of being the group's creator.
+            # A group can thus (if other logic allows for it) have no admins,
+            # but it always has a creator.
+            self.creator = self.admins.all().order_by('?')[0]
     
-    @models.permalink
-    def get_absolute_url(self):
-        return ('usergroups.views.group_detail', (), { 'group_id': self.id })
+    def is_admin(self, user):
+        """Test if supplied user is an admin (or the creator) of group."""
+        return user in self.admins.all() or user == self.creator
     
     def save(self, *args, **kwargs):
-        created = False
-        if not self.pk:
-            created = True
+        created = not self.pk is None
         super(BaseUserGroup, self).save(*args, **kwargs)
         if created:
             self.admins.add(self.creator)
             self.members.add(self.creator)
+    
+    @models.permalink
+    def get_absolute_url(self):
+        return ('usergroups.views.group_detail', (self.id, ))
+    
+    def __unicode__(self):
+        return self.name
     
     class Meta:
         abstract = True
@@ -48,14 +57,19 @@ class BaseUserGroup(models.Model):
 class UserGroupApplication(models.Model):
     """An application to join a user group."""
     user = models.ForeignKey(User)
-    usergroup = models.ForeignKey('UserGroup')
-
+    group = models.ForeignKey('UserGroup')
+    created = models.DateTimeField(default=datetime.datetime.now)
+    
+    def __unicode__(self):
+        return '%s applied to join %s' % (self.user.get_full_name(),
+                                          self.group.name)
 
 class UserGroupInvitation(models.Model):
     """An invitation to join a user group."""
     user = models.ForeignKey(User)
-    usergroup = models.ForeignKey('UserGroup')
+    group = models.ForeignKey('UserGroup')
     secret_key = models.CharField(max_length=30)
+    created = models.DateTimeField(default=datetime.datetime.now)
     
     objects = UserGroupInvitationManager()
     
@@ -83,8 +97,8 @@ else:
         pass
 
 # Make sure that we're extending BaseUserGroup. (This isn't really necessary
-# as we're really only interested in the slug-field and save-logic, but it's
-# easier than checking and explaining)
+# as we're really only interested in the save-logic and the admins m2m, but
+# it's easier than checking and explaining)
 
 if not issubclass(UserGroup, BaseUserGroup):
     raise ValueError(u"The model used in usergroups must extend BaseUserGroup.")
