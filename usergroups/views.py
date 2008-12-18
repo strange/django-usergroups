@@ -4,7 +4,9 @@ from django.views.generic import list_detail
 from django.views.generic import simple
 from django.http import HttpResponseRedirect
 from django.http import HttpResponseForbidden
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils import simplejson
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 
@@ -89,7 +91,7 @@ def edit_group(request, group, group_id, form_class=UserGroupForm):
 
 @group_admin_required
 def delete_group(request, group, group_id):
-    """Delete an existing group."""
+    """Delete an existing group and render a template."""
     group_name = group.name
     group.delete()
     return simple.direct_to_template(request,
@@ -116,9 +118,22 @@ def add_admin(request, group, group_id, user_id):
 @login_required
 @group_admin_required
 def revoke_admin(request, group, group_id, user_id):
-    """Revoke an admins's administrative privilegies in a group."""
+    """Revoke an admins's administrative privilegies in a group.
+    
+    Will return a JSON serialized dict if called with headers picked up by
+    ``is_ajax()``.
+    
+    """
     user = get_object_or_404(User, pk=user_id)
     group.remove_admin(user)
+    if request.is_ajax():
+        response = {
+            'message': 'Admin rights for user revoked',
+            'user_id': user.id,
+        }
+        return HttpResponse(simplejson.dumps(json_response),
+                            mimetype='application/javascript')
+    
     return HttpResponseRedirect(group.get_absolute_url())
 
 @login_required
@@ -127,10 +142,21 @@ def remove_member(request, group, group_id, user_id):
     """Remove a member from the group. Also removes the user from the list
     of admins if applicable.
     
+    Will return a JSON serialized dict if called with headers picked up by
+    ``is_ajax()``.
+
     """
     user = get_object_or_404(User, pk=user_id)
     group.remove_admin(user)
     group.members.remove(user)
+    if request.is_ajax():
+        response = {
+            'message': 'Member removed from group',
+            'user_id': user.id,
+        }
+        return HttpResponse(simplejson.dumps(json_response),
+                            mimetype='application/javascript')
+    
     return HttpResponseRedirect(group.get_absolute_url())
 
 @login_required
@@ -138,10 +164,22 @@ def leave_group(request, group_id):
     """Allow a user to leave a group. Also removes the user from the list
     of admins if applicable.
     
+    Will return a JSON serialized dict if called with headers picked up by
+    ``is_ajax()``.
+
     """
     group = get_object_or_404(UserGroup, pk=group_id)
     group.remove_admin(request.user)
     group.members.remove(request.user)
+
+    if request.is_ajax():
+        response = {
+            'message': 'You have left the group',
+            'user_id': request.user.id,
+        }
+        return HttpResponse(simplejson.dumps(json_response),
+                            mimetype='application/javascript')
+
     return HttpResponseRedirect(group.get_absolute_url())
 
 # Invitation/application views
@@ -149,9 +187,23 @@ def leave_group(request, group_id):
 @login_required
 @group_admin_required
 def invite_user(request, group, group_id, user_id):
-    """Create an invitation to a user group for a user."""
+    """Create an invitation to a user group for a user.
+    
+    Will return a JSON serialized dict if called with headers picked up by
+    ``is_ajax()``.
+    
+    """
     user = get_object_or_404(User, pk=user_id)
     invitation = UserGroupInvitation.objects.create(user=user, group=group)
+    if request.is_ajax():
+        response = {
+            'message': 'Invitation sent',
+            'user_id': user.id,
+            'invitation_id': invitation.id,
+        }
+        return HttpResponse(simplejson.dumps(json_response),
+                            mimetype='application/javascript')
+
     return simple.direct_to_template(request, extra_context=locals(),
                                      template='groups/invitation_sent.html')
 
@@ -159,26 +211,60 @@ def handle_group_invitation(request, group_id, secret_key):
     """Validates an invitation to a user group. If the credentials received
     are valid the user is added as a user in the group.
     
+    Will return a JSON serialized dict if called with headers picked up by
+    ``is_ajax()``.
+    
     """
     group = get_object_or_404(UserGroup, pk=group_id)
     valid = UserGroupInvitation.objects.handle_invitation(request.user,
                                                           group,
                                                           secret_key)
+    if request.is_ajax():
+        response = {
+            'valid': valid,
+            'message': valid and 'Invitation approved' or 'Invalid invitation',
+        }
+        return HttpResponse(simplejson.dumps(json_response),
+                            mimetype='application/javascript')
+
+
     return simple.direct_to_template(request, extra_context=locals(),
                                      template='groups/invitation.html')
 
 @login_required
 @group_admin_required
 def approve_application(request, group, group_id, application_id):
-    """Approv an application"""
+    """Approve an application.
+    
+    Will return a JSON serialized dict if called with headers picked up by
+    ``is_ajax()``.
+    
+    """
     application = get_object_or_404(UserGroupApplication, pk=application_id)
     group.members.add(application.user)
+    application_id = application.id
     application.delete()
+    
+    if request.is_ajax():
+        response = {
+            'message': 'Application approved',
+            'user_id': application.user.id,
+            'application_id': application_id,
+        }
+        return HttpResponse(simplejson.dumps(json_response),
+                            mimetype='application/javascript')
+
+    
     return HttpResponseRedirect(group.get_absolute_url())
 
 @login_required
 def apply_to_join_group(request, group_id):
-    """Allow a user to apply to join a user group."""
+    """Allow a user to apply to join a user group.
+    
+    Will return a JSON serialized dict if called with headers picked up by
+    ``is_ajax()``.
+    
+    """
     group = get_object_or_404(UserGroup, pk=group_id)
     already_member = request.user in group.members.all()
     if not already_member:
@@ -192,5 +278,13 @@ def apply_to_join_group(request, group_id):
     
     extra_context = { 'group': group, 'already_member': already_member }
     
+    if request.is_ajax():
+        response = {
+            'message': already_member and 'You\'re already a member of group' or 'Application sent',
+            'already_member': already_member,
+        }
+        return HttpResponse(simplejson.dumps(json_response),
+                            mimetype='application/javascript')
+
     return simple.direct_to_template(request, extra_context=extra_context,
                                      template='usergroups/application.html')
