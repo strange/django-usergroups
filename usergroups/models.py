@@ -31,13 +31,14 @@ class BaseUserGroup(models.Model):
             # A group can thus (if other logic allows for it) have no admins,
             # but it always has a creator.
             self.creator = self.admins.all().order_by('?')[0]
+            self.save()
     
     def is_admin(self, user):
         """Test if supplied user is an admin (or the creator) of group."""
         return user in self.admins.all() or user == self.creator
     
     def save(self, *args, **kwargs):
-        created = not self.pk is None
+        created = self.pk is None
         super(BaseUserGroup, self).save(*args, **kwargs)
         if created:
             self.admins.add(self.creator)

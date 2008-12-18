@@ -5,6 +5,11 @@ urlpatterns = patterns('',
     url(r'^(?P<group_id>\d+)/$', 'usergroups.views.group_detail',
         name='usergroups_group_detail'),
     
+    # Leave
+    url(r'^(?P<group_id>\d+)/leave/$',
+        'usergroups.views.leave_group', name='usergroups_leave_group'),
+    
+    
     # Invitations
     url(r'^(?P<group_id>\d+)/invitations/create/(?P<user_id>\d+)/$',
         'usergroups.views.invite_user', name='usergroups_invite_user'),
@@ -28,4 +33,8 @@ urlpatterns = patterns('',
     # Create, edit and delete
     url(r'^create/$', 'usergroups.views.create_group',
         name='usergroups_create_group'),
+    url(r'^(?P<group_id>\d+)/edit/$', 'usergroups.views.edit_group',
+        name='usergroups_edit_group'),
+    url(r'^(?P<group_id>\d+)/delete/$', 'usergroups.views.delete_group',
+        name='usergroups_delete_group'),
 )

@@ -134,11 +134,12 @@ def remove_member(request, group, group_id, user_id):
     return HttpResponseRedirect(group.get_absolute_url())
 
 @login_required
-def leave_group(request, group, group_id):
+def leave_group(request, group_id):
     """Allow a user to leave a group. Also removes the user from the list
     of admins if applicable.
     
     """
+    group = get_object_or_404(UserGroup, pk=group_id)
     group.remove_admin(request.user)
     group.members.remove(request.user)
     return HttpResponseRedirect(group.get_absolute_url())
