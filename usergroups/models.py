@@ -55,10 +55,29 @@ class BaseUserGroup(models.Model):
         abstract = True
 
 
+# First test if a custom usergroup model has been supplied. If not, create a
+# subclass of BaseUserGroup.
+
+if hasattr(settings, 'USERGROUPS_MODEL'):
+    UserGroup = get_model(*settings.USERGROUPS_MODEL.split('.'))
+    if UserGroup is None:
+        raise ValueError(u"Custom usergroups model could not be loaded.")
+else:
+    class UserGroup(BaseUserGroup):
+        pass
+
+# Make sure that we're extending BaseUserGroup. (This isn't really necessary
+# as we're really only interested in the save-logic and the admins m2m, but
+# it's easier than checking and explaining)
+
+if not issubclass(UserGroup, BaseUserGroup):
+    raise ValueError(u"The model used in usergroups must extend BaseUserGroup.")
+
+
 class UserGroupApplication(models.Model):
     """An application to join a user group."""
     user = models.ForeignKey(User)
-    group = models.ForeignKey('UserGroup')
+    group = models.ForeignKey(UserGroup)
     created = models.DateTimeField(default=datetime.datetime.now)
     
     def __unicode__(self):
@@ -68,7 +87,7 @@ class UserGroupApplication(models.Model):
 class UserGroupInvitation(models.Model):
     """An invitation to join a user group."""
     user = models.ForeignKey(User)
-    group = models.ForeignKey('UserGroup')
+    group = models.ForeignKey(UserGroup)
     secret_key = models.CharField(max_length=30)
     created = models.DateTimeField(default=datetime.datetime.now)
     
@@ -84,22 +103,3 @@ class UserGroupInvitation(models.Model):
         if self.secret_key is None:
             self.secret_key = self.generate_secret_key()
         super(UserGroupInvitation, self).save(*args, **kwargs)
-        
-
-# First test if a custom usergroup model has been supplied. If not, create a
-# subclass of BaseUserGroup.
-
-if hasattr(settings, 'USERGROUPS_MODEL'):
-    UserGroup = get_model(*getattr(settings, 'USERGROUPS_MODEL').split('.'))
-    if UserGroup is None:
-        raise ValueError(u"Custom usergroups model could not be loaded.")
-else:
-    class UserGroup(BaseUserGroup):
-        pass
-
-# Make sure that we're extending BaseUserGroup. (This isn't really necessary
-# as we're really only interested in the save-logic and the admins m2m, but
-# it's easier than checking and explaining)
-
-if not issubclass(UserGroup, BaseUserGroup):
-    raise ValueError(u"The model used in usergroups must extend BaseUserGroup.")

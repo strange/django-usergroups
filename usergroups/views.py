@@ -60,7 +60,7 @@ def create_group(request, form_class=UserGroupForm):
     instance = UserGroup(creator=request.user)
     
     if request.method == "POST":
-        form = form_class(request.POST, instance=instance)
+        form = form_class(request.POST, request.FILES, instance=instance)
         if form.is_valid():
             new_group = form.save()
             return HttpResponseRedirect(new_group.get_absolute_url())
@@ -80,7 +80,7 @@ def edit_group(request, group, group_id, form_class=UserGroupForm):
     
     """
     if request.method == "POST":
-        form = form_class(request.POST, instance=group)
+        form = form_class(request.POST, request.FILES, instance=group)
         if form.is_valid():
             return HttpResponseRedirect(group.get_absolute_url())
     else:
