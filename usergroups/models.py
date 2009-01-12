@@ -18,8 +18,8 @@ class BaseUserGroup(models.Model):
     website = models.URLField(blank=True)
     
     creator = models.ForeignKey(User)
-    admins = models.ManyToManyField(User, related_name='admins')
-    members = models.ManyToManyField(User, related_name='members')
+    admins = models.ManyToManyField(User, related_name='admin_of_groups')
+    members = models.ManyToManyField(User, related_name='member_of_groups')
     
     created = models.DateTimeField(default=datetime.datetime.now)
     

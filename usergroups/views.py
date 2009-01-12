@@ -172,6 +172,11 @@ def leave_group(request, group_id):
 
     """
     group = get_object_or_404(UserGroup, pk=group_id)
+    
+    if group.admins.count() <= 1:
+        return HttpResponseRedirect(reverse('usergroups_delete_group',
+                                            args=[group.pk]))
+        
     group.remove_admin(request.user)
     group.members.remove(request.user)
 
