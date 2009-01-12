@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Create Group{% endblock %}
+{% block title %}{% if form.instance %}Edit{% else %}Create{% endif %} Group{% endblock %}
 
 {% block bodyclass %}create-group{% endblock %}
 
 {% block content %}
-<h1>Create Group</h1>
+<h1>{% if form.instance %}Edit{% else %}Create{% endif %} Group</h1>
 <form action="." method="post" accept-charset="utf-8"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %}>
     {{ form.as_p }}
-    <p class="submit"><input type="submit" value="Create Group"></p>
+    <p class="submit"><input type="submit" value="{% if form.instance %}Edit{% else %}Create{% endif %} Group"></p>
 </form>
 {% endblock %}

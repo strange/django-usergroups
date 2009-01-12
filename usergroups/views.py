@@ -83,6 +83,7 @@ def edit_group(request, group, group_id, form_class=UserGroupForm):
     if request.method == "POST":
         form = form_class(request.POST, request.FILES, instance=group)
         if form.is_valid():
+            form.save()
             return HttpResponseRedirect(group.get_absolute_url())
     else:
         form = form_class(instance=group)
@@ -150,6 +151,9 @@ def remove_member(request, group, group_id, user_id):
 
     """
     user = get_object_or_404(User, pk=user_id)
+    if user == request.user:
+        return HttpResponseRedirect(reverse('usergroups_leave_group',
+                                            args=[group.pk]))
     group.remove_admin(user)
     group.members.remove(user)
     if request.is_ajax():
