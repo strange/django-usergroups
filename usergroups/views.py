@@ -30,8 +30,8 @@ def group_list(request, queryset=None, extra_context={}, paginate_by=None):
 def group_detail(request, group_id, extra_context={}, paginate_by=None):
     group = get_object_or_404(UserGroup, pk=group_id)
     
-    queryset = group.members.all()
-    
+    queryset = group.members.all().select_related()
+        
     ec = extra_context.copy()
     is_admin = group.is_admin(request.user)
     ec.update({

@@ -38,15 +38,16 @@ class BaseUserGroup(models.Model):
         return user in self.admins.all() or user == self.creator
     
     def save(self, *args, **kwargs):
+        """Override to set add the creator as an admin and member."""
         created = self.pk is None
         super(BaseUserGroup, self).save(*args, **kwargs)
         if created:
             self.admins.add(self.creator)
             self.members.add(self.creator)
     
-    @models.permalink
     def get_absolute_url(self):
         return ('usergroups.views.group_detail', (self.id, ))
+    get_absolute_url = models.permalink(get_absolute_url)
     
     def __unicode__(self):
         return self.name
