@@ -7,6 +7,7 @@ from django.http import HttpResponseForbidden
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import simplejson
+from django.core.urlresolvers import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 
@@ -92,11 +93,13 @@ def edit_group(request, group, group_id, form_class=UserGroupForm):
 @group_admin_required
 def delete_group(request, group, group_id):
     """Delete an existing group and render a template."""
-    group_name = group.name
-    group.delete()
+    if request.method == "POST":
+        group.delete()
+        return HttpResponseRedirect(reverse('usergroups_delete_group_done'))
+    
     return simple.direct_to_template(request,
-                                     extra_context={ 'group_name': group_name },
-                                     template='usergroups/group_deleted.html')
+                                     extra_context={ 'group': group },
+                                     template='usergroups/delete_group_confirm.html')
 
 # Group administration views
 

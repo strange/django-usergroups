@@ -37,4 +37,7 @@ urlpatterns = patterns('',
         name='usergroups_edit_group'),
     url(r'^(?P<group_id>\d+)/delete/$', 'usergroups.views.delete_group',
         name='usergroups_delete_group'),
+    url(r'^group-deleted/$', 'django.views.generic.simple.direct_to_template',
+        { 'template': 'usergroups/delete_group_done.html' },
+        name='usergroups_delete_group_done')
 )
