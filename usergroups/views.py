@@ -87,7 +87,7 @@ def edit_group(request, group, group_id, form_class=UserGroupForm):
             return HttpResponseRedirect(group.get_absolute_url())
     else:
         form = form_class(instance=group)
-    
+    form.update = True
     return simple.direct_to_template(request, extra_context=locals(),
                                      template='usergroups/group_form.html')
 
