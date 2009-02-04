@@ -221,13 +221,19 @@ def validate_email_invitation(request, group_id, key):
     try:
         invitation = EmailInvitation.objects.get(secret_key=key, group=group)
         invitation.delete()
-        if request.user not in group.members.all():
-            group.members.add(request.user)
-        return HttpResponseRedirect(reverse('usergroups_group_joined',
-                                            args=(group.pk, )))
     except EmailInvitation.DoesNotExist:
         return HttpResponseRedirect(reverse('usergroups_invalid_invitation',
                                             args=(group.pk, )))
+    except EmailInvitation.MultipleObjectsReturned:
+        invitations = EmailInvitation.objects.filter(secret_key=key,
+                                                     group=group)
+        invitations.delete()
+    
+    if request.user not in group.members.all():
+        group.members.add(request.user)
+    return HttpResponseRedirect(reverse('usergroups_group_joined',
+                                        args=(group.pk, )))
+
 
 def group_joined(request, group_id):
     group = get_object_or_404(UserGroup, pk=group_id)
