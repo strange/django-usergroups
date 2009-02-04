@@ -65,6 +65,7 @@ class EmailInvitationForm(forms.Form):
             }).replace('\n', ' ')
             message = render_to_string('usergroups/invitation_body.txt', {
                 'activation_key': invitation.secret_key,
+                'user': self.user,
                 'site': current_site,
                 'group': self.group,
                 'url': url,
