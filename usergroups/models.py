@@ -120,7 +120,7 @@ class EmailInvitation(models.Model):
         """Generate a secret key."""
         # Stolen from James Bennet! Oh my!
         salt = sha.new(str(random.random())).hexdigest()[:5]
-        return sha.new(salt + self.user.username).hexdigest()
+        return sha.new(salt + self.user.username).hexdigest()[:30]
     
     def save(self, *args, **kwargs):
         if not self.secret_key:
