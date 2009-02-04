@@ -14,7 +14,9 @@ from django.contrib.auth.models import User
 from usergroups.models import UserGroup
 from usergroups.models import UserGroupInvitation
 from usergroups.models import UserGroupApplication
+from usergroups.models import EmailInvitation
 from usergroups.forms import UserGroupForm
+from usergroups.forms import EmailInvitationForm
 from usergroups.decorators import group_admin_required
 
 # Display views
@@ -198,6 +200,42 @@ def leave_group(request, group_id):
 
 @login_required
 @group_admin_required
+def create_email_invitation(request, group, group_id):
+    """Create and send an invitation to a ``UserGroup`` via e-mail."""
+    if request.method == 'POST':
+        form = EmailInvitationForm(user=request.user, group=group,
+                                   data=request.POST)
+        if form.is_valid():
+            form.send_invitations()
+            return HttpResponseRedirect(group.get_absolute_url())
+    else:
+        form = EmailInvitationForm(user=request.user, group=group)
+
+    return simple.direct_to_template(request, extra_context=locals(),
+                                     template='usergroups/create_email_invitation.html')
+
+@login_required
+def validate_email_invitation(request, group_id, key):
+    """Validate an invitation."""
+    group = get_object_or_404(UserGroup, pk=group_id)
+    try:
+        invitation = EmailInvitation.objects.get(secret_key=key, group=group)
+        invitation.delete()
+        if request.user not in group.members.all():
+            group.members.add(request.user)
+        return HttpResponseRedirect(reverse('usergroups_group_joined',
+                                            args=(group.pk, )))
+    except EmailInvitation.DoesNotExist:
+        return HttpResponseRedirect(reverse('usergroups_invalid_invitation',
+                                            args=(group.pk, )))
+
+def group_joined(request, group_id):
+    group = get_object_or_404(UserGroup, pk=group_id)
+    return simple.direct_to_template(request, extra_context=locals(),
+                                     template='usergroups/group_joined.html')
+
+@login_required
+@group_admin_required
 def invite_user(request, group, group_id, user_id):
     """Create an invitation to a user group for a user.
     
@@ -219,27 +257,16 @@ def invite_user(request, group, group_id, user_id):
     return simple.direct_to_template(request, extra_context=locals(),
                                      template='groups/invitation_sent.html')
 
+@login_required
 def handle_group_invitation(request, group_id, secret_key):
     """Validates an invitation to a user group. If the credentials received
     are valid the user is added as a user in the group.
-    
-    Will return a JSON serialized dict if called with headers picked up by
-    ``is_ajax()``.
     
     """
     group = get_object_or_404(UserGroup, pk=group_id)
     valid = UserGroupInvitation.objects.handle_invitation(request.user,
                                                           group,
                                                           secret_key)
-    if request.is_ajax():
-        response = {
-            'valid': valid,
-            'message': valid and 'Invitation approved' or 'Invalid invitation',
-        }
-        return HttpResponse(simplejson.dumps(json_response),
-                            mimetype='application/javascript')
-
-
     return simple.direct_to_template(request, extra_context=locals(),
                                      template='groups/invitation.html')
 

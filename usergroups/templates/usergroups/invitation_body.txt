@@ -1,0 +1,5 @@
+{{ user.get_full_name }} has invited you to join the group "{{ group.name }}" on {{ site.name }}.
+
+Click on the link below to join:
+
+{{ url }}

@@ -13,8 +13,20 @@ urlpatterns = patterns('',
         'usergroups.views.remove_member', name='usergroups_remove_member'),
     
     # Invitations
-    url(r'^(?P<group_id>\d+)/invitations/create/(?P<user_id>\d+)/$',
-        'usergroups.views.invite_user', name='usergroups_invite_user'),
+    # url(r'^(?P<group_id>\d+)/invitations/create/(?P<user_id>\d+)/$',
+    #     'usergroups.views.invite_user', name='usergroups_invite_user'),
+    url(r'^(?P<group_id>\d+)/invitations/send/$',
+        'usergroups.views.create_email_invitation',
+        name='usergroups_create_email_invitation'),
+    url(r'^(?P<group_id>\d+)/invitations/validate/(?P<key>.*?)/$',
+        'usergroups.views.validate_email_invitation',
+        name='usergroups_validate_email_invitation'),
+    url(r'^(?P<group_id>\d+)/joined/', 'usergroups.views.group_joined',
+        name='usergroups_group_joined'),
+    url(r'^(?P<group_id>\d+)/invitations/invalid/',
+        'django.views.generic.simple.direct_to_template',
+        { 'template': 'usergroups/invalid_invitation.html' },
+        name='usergroups_invalid_invitation'),
     
     # Applications
     url(r'^(?P<group_id>\d+)/applications/apply/$',
