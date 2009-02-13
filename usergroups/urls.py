@@ -8,6 +8,8 @@ urlpatterns = patterns('',
     # Members
     url(r'^(?P<group_id>\d+)/leave/$',
         'usergroups.views.leave_group', name='usergroups_leave_group'),
+    url(r'^(?P<group_id>\d+)/members/$',
+        'usergroups.views.member_list', name='usergroups_member_list'),
 
     url(r'^(?P<group_id>\d+)/members/(?P<user_id>\d+)/remove/$',
         'usergroups.views.remove_member', name='usergroups_remove_member'),
@@ -35,6 +37,9 @@ urlpatterns = patterns('',
     url(r'^(?P<group_id>\d+)/applications/(?P<application_id>\d+)/approve/$',
         'usergroups.views.approve_application',
         name='usergroups_approve_application'),
+    url(r'^(?P<group_id>\d+)/applications/(?P<application_id>\d+)/ignore/$',
+        'usergroups.views.ignore_application',
+        name='usergroups_ignore_application'),
     
     # Admins
     url(r'^(?P<group_id>\d+)/admins/(?P<user_id>\d+)/add/$',
