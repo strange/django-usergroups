@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import simplejson
 from django.views.generic import list_detail
 from django.views.generic import simple
+from django.conf import settings
 
 from usergroups.decorators import group_admin_required
 from usergroups.forms import EmailInvitationForm
@@ -18,6 +19,13 @@ from usergroups.models import EmailInvitation
 from usergroups.models import UserGroup
 from usergroups.models import UserGroupApplication
 from usergroups.models import UserGroupInvitation
+
+if "notification" in settings.INSTALLED_APPS and \
+   hasattr(settings, 'USERGROUPS_SEND_NOTIFICATIONS') and \
+   settings.USERGROUPS_SEND_NOTIFICATIONS:
+    from notification import models as notification
+else:
+    notification = None
 
 # Display views
 
@@ -198,7 +206,7 @@ def leave_group(request, group_id):
     """
     group = get_object_or_404(UserGroup, pk=group_id)
 
-    if group.admins.count() <= 1:
+    if group.admins.count() <= 1 and request.user in group.admins.all():
         return HttpResponseRedirect(reverse('usergroups_delete_group',
                                             args=[group.pk]))
 
@@ -307,7 +315,18 @@ def approve_application(request, group, group_id, application_id):
     application = get_object_or_404(UserGroupApplication, pk=application_id)
     group.members.add(application.user)
     application_id = application.id
+
+    applicant = application.user
+    context = {
+        'group': group,
+        'applicant': applicant,
+    }
+
     application.delete()
+
+    if notification:
+        notification.send([applicant], 'usergroups_application_approved',
+                          context)
 
     if request.is_ajax():
         response = {
@@ -362,8 +381,17 @@ def apply_to_join_group(request, group_id):
                                                            group=group)
             application.created = datetime.datetime.now()
             application.save()
+
+
         except UserGroupApplication.DoesNotExist:
-            UserGroupApplication.objects.create(user=request.user, group=group)
+            application = UserGroupApplication.objects.create(user=request.user,
+                                                              group=group)
+            context = {
+                'application': application,
+                'group': group,
+            }
+            if notification:
+                notification.send(group.admins.all(), 'usergroups_application', context)
 
     extra_context = { 'group': group, 'already_member': already_member }
 
