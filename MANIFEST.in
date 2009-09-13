@@ -1,0 +1,1 @@
+recursive-include usergroups/templates *.html
