@@ -156,6 +156,9 @@ True
 >>> r.status_code
 200
 
+>>> Group.objects.count()
+0
+
 >>> g.name
 'group'
 
