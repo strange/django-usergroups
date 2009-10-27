@@ -64,7 +64,6 @@ class BaseUserGroupConfiguration(object):
     def get_edit_group_form(self):
         return self.get_create_group_form()
 
-
     # Views
 
     def group_list(self, request, queryset=None, extra_context=None):
@@ -129,12 +128,8 @@ class BaseUserGroupConfiguration(object):
                                   template=self.create_group_template_name)
 
     @login_required
-    def edit_group(request, group_id):
+    def edit_group(self, request, group_id, extra_context=None):
         """Edit an existing user group.
-
-        A custom form can be supplied via the ``form_class`` argument. The form
-        will be fed an existing group instance and the form's ``is_valid()``
-        method will be called prior to save.
 
         """
         instance = get_object_or_404(self.model, pk=group_id)
@@ -143,10 +138,14 @@ class BaseUserGroupConfiguration(object):
         form = form_class(request.POST or None, request.FILES or None,
                           instance=instance)
         if form.is_valid():
-            form.save()
-            return HttpResponseRedirect(group.get_absolute_url())
+            instance = form.save()
+            return http.HttpResponseRedirect(reverse('usergroups_group_detail',
+                                                     args=(self.slug, instance.pk)))
 
-        return direct_to_template(request, extra_context=locals(),
+        extra_context = extra_context or None
+        extra_context.update({ 'form': form })
+
+        return direct_to_template(request, extra_context=extra_context,
                                   template=self.edit_group_template_name)
 
     @login_required

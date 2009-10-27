@@ -24,7 +24,7 @@ True
 >>> c3 = Client()
 
 # Create a test-group
->>> g = Group.objects.create(creator=u1)
+>>> g = Group.objects.create(creator=u1, name='group')
 
 >>> assert(g.admins.count() == 1)
 >>> assert(g.members.count() == 1)
@@ -149,6 +149,25 @@ True
 
 >>> g.admins.count()
 1
+
+# Delete group
+>>> r = get(c1, 'usergroups_delete_group',
+...         { 'slug': 'test', 'group_id': g.pk })
+>>> r.status_code
+200
+
+>>> g.name
+'group'
+
+>>> r = post(c1, 'usergroups_edit_group',
+...          { 'name': 'Group', 'extra': 'extra stuff' },
+...          { 'slug': 'test', 'group_id': g.pk })
+>>> r.status_code
+302
+
+>>> g = Group.objects.get(pk=1)
+>>> g.name
+u'Group'
 
 # TEST: Auto assign creator and admins.
 # TEST: JSON responses.

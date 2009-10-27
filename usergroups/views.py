@@ -27,6 +27,9 @@ def group_detail(request, slug, *args, **kwargs):
 def create_group(request, slug, *args, **kwargs):
     return dispatcher(request, slug, 'create_group', *args, **kwargs)
 
+def edit_group(request, slug, *args, **kwargs):
+    return dispatcher(request, slug, 'edit_group', *args, **kwargs)
+
 def delete_group(request, slug, *args, **kwargs):
     return dispatcher(request, slug, 'delete_group', *args, **kwargs)
 

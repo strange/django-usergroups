@@ -40,16 +40,16 @@ p = (
     url(r'^(?P<slug>\w+)/(?P<group_id>\d+)/admins/(?P<user_id>\d+)/revoke/$',
         'usergroups.views.revoke_admin', name='usergroups_revoke_admin'),
     
-    ## Create, edit and delete
+    # Create, edit and delete
     url(r'^(?P<slug>\w+)/create/$', 'usergroups.views.create_group',
         name='usergroups_create_group'),
-    #url(r'^(?P<group_id>\d+)/edit/$', 'usergroups.views.edit_group',
-        #name='usergroups_edit_group'),
+    url(r'^(?P<slug>\w+)/(?P<group_id>\d+)/edit/$',
+        'usergroups.views.edit_group', name='usergroups_edit_group'),
     url(r'^(?P<slug>\w+)/(?P<group_id>\d+)/delete/$', 'usergroups.views.delete_group',
         name='usergroups_delete_group'),
-    #url(r'^group-deleted/$', 'django.views.generic.simple.direct_to_template',
-        #{ 'template': 'usergroups/delete_group_done.html' },
-        #name='usergroups_delete_group_done')
+    url(r'^group-deleted/$', 'django.views.generic.simple.direct_to_template',
+        { 'template': 'usergroups/delete_group_done.html' },
+        name='usergroups_delete_group_done')
 )
 
 urlpatterns = patterns('', *p)
