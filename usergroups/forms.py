@@ -4,15 +4,7 @@ from django.contrib.sites.models import Site
 from django.forms.fields import email_re
 from django.conf import settings
 
-from usergroups.models import UserGroup
 from usergroups.models import EmailInvitation
-
-class UserGroupForm(forms.ModelForm):
-    """Allow a user to create and modify a user group."""
-    class Meta:
-        model = UserGroup
-        exclude = ('members', 'admins', 'creator', 'created')
-
 
 class EmailInvitationForm(forms.Form):
     """Simple form to clean multiple e-mail addresses."""
@@ -42,7 +34,7 @@ class EmailInvitationForm(forms.Form):
                 raise forms.ValidationError("One or more e-mail addresses were not valid.")
         return emails
     
-    def send_invitations(self):
+    def send_invitations(self, slug):
         # TODO: Move to manager
         from django.core.urlresolvers import reverse
         if "mailer" in settings.INSTALLED_APPS:
@@ -57,8 +49,8 @@ class EmailInvitationForm(forms.Form):
                                                         email=email)
             url = 'http://%s%s' % (current_site.domain,
                                    reverse('usergroups_validate_email_invitation',
-                                           args=(self.group.pk,
-                                                 invitation.secret_key, )))
+                                           args=(slug, self.group.pk,
+                                                 invitation.secret_key)))
             subject = render_to_string('usergroups/invitation_subject.txt', {
                 'user': self.user,
                 'site': current_site

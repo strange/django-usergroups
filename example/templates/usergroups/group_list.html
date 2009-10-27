@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Group List{% endblock %}
+
+{% block content %}
+<h1>Group List</h1>
+
+{% if group_list.count %}
+<ul>
+    {% for group in group_list %}
+    <li><a href="{% url usergroups_group_detail group_config.slug group.pk %}">{{ group.name }}</a></li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<p><a href="{% url usergroups_create_group group_config.slug %}">Create Group</a></p>
+
+{% endblock %}

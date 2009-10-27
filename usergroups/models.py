@@ -2,11 +2,13 @@ import datetime
 import random
 import sha
 
+from django.conf import settings
+from django.contrib.auth.models import User
+from django.contrib.contenttypes import generic
+from django.contrib.contenttypes.models import ContentType
+from django.core.urlresolvers import reverse
 from django.db import models
 from django.db.models import get_model
-from django.contrib.auth.models import User
-from django.conf import settings
-from django.core.urlresolvers import reverse
 
 from usergroups.managers import UserGroupInvitationManager
 
@@ -35,7 +37,7 @@ class BaseUserGroup(models.Model):
     
     def is_admin(self, user):
         """Test if supplied user is an admin (or the creator) of group."""
-        return user in self.admins.all() or user == self.creator
+        return user == self.creator or user in self.admins.all()
     
     def save(self, *args, **kwargs):
         """Override to set add the creator as an admin and member."""
@@ -45,10 +47,6 @@ class BaseUserGroup(models.Model):
             self.admins.add(self.creator)
             self.members.add(self.creator)
     
-    def get_absolute_url(self):
-        return ('usergroups.views.group_detail', (self.id, ))
-    get_absolute_url = models.permalink(get_absolute_url)
-    
     def __unicode__(self):
         return self.name
     
@@ -56,39 +54,28 @@ class BaseUserGroup(models.Model):
         abstract = True
 
 
-# First test if a custom usergroup model has been supplied. If not, create a
-# subclass of BaseUserGroup.
+class BaseGroupRelation(models.Model):
+    content_type = models.ForeignKey(ContentType)
+    object_id = models.PositiveIntegerField()
 
-if hasattr(settings, 'USERGROUPS_MODEL'):
-    UserGroup = get_model(*settings.USERGROUPS_MODEL.split('.'))
-    if UserGroup is None:
-        raise ValueError(u"Custom usergroups model could not be loaded.")
-else:
-    class UserGroup(BaseUserGroup):
-        pass
+    group = generic.GenericForeignKey()
 
-# Make sure that we're extending BaseUserGroup. (This isn't really necessary
-# as we're really only interested in the save-logic and the admins m2m, but
-# it's easier than checking and explaining)
-
-if not issubclass(UserGroup, BaseUserGroup):
-    raise ValueError(u"The model used in usergroups must extend BaseUserGroup.")
+    class Meta:
+        abstract = True
 
 
-class UserGroupApplication(models.Model):
+class UserGroupApplication(BaseGroupRelation):
     """An application to join a user group."""
     user = models.ForeignKey(User)
-    group = models.ForeignKey(UserGroup)
     created = models.DateTimeField(default=datetime.datetime.now)
     
     def __unicode__(self):
         return '%s applied to join %s' % (self.user.get_full_name(),
                                           self.group.name)
 
-class UserGroupInvitation(models.Model):
+class UserGroupInvitation(BaseGroupRelation):
     """An invitation to join a user group."""
     user = models.ForeignKey(User)
-    group = models.ForeignKey(UserGroup)
     secret_key = models.CharField(max_length=30)
     created = models.DateTimeField(default=datetime.datetime.now)
     
@@ -106,10 +93,9 @@ class UserGroupInvitation(models.Model):
         super(UserGroupInvitation, self).save(*args, **kwargs)
 
 
-class EmailInvitation(models.Model):
+class EmailInvitation(BaseGroupRelation):
     """An invitation to join a user group."""
     user = models.ForeignKey(User)
-    group = models.ForeignKey(UserGroup)
     email = models.EmailField()
     secret_key = models.CharField(max_length=30)
     created = models.DateTimeField(default=datetime.datetime.now)

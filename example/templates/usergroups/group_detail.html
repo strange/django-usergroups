@@ -1,13 +1,12 @@
 {% extends "base.html" %}
 
-
-{% block title %}Organization: {{ group.name }}{% endblock %}
+{% block title %}Group: {{ group.name }}{% endblock %}
 
 {% block content %}
 <h1>{{ group.name }}</h1>
 
 {% if is_admin %}
-<p><a href="{% url usergroups_delete_group group.id %}">Delete Group</a></p>
+<p><a href="{% url usergroups_delete_group group_config.slug group.id %}">Delete Group</a></p>
 <h2>Applications</h2>
 {% if group.usergroupapplication_set.count %}
 <ul>
@@ -22,13 +21,13 @@
 {% if group.admins.count %}
 <ul>
     {% for admin in group.admins.all %}
-    <li>{{ admin.get_full_name }}{% if is_admin %} <a href="{% url usergroups_revoke_admin group.id admin.id %}">Revoke admin privileges</a>{% endif %}</li>
+    <li>{{ admin.get_full_name|default:admin.username }}{% if is_admin %} <a href="{% url usergroups_revoke_admin group_config.slug group.id admin.id %}">Revoke admin privileges</a>{% endif %}</li>
     {% endfor %}
 </ul>
 {% endif %}
 
 {% if is_member %}
-<p><a href="{% url usergroups_leave_group group.id %}">Leave Group</a></p>
+<p><a href="{% url usergroups_leave_group group_config.slug group.id %}">Leave Group</a></p>
 {% endif %}
 
 {% if user.is_authenticated and not is_member %}
@@ -39,7 +38,7 @@
 {% if member_list.count %}
 <ul>
     {% for member in member_list %}
-    <li>{{ member.get_full_name }}{% if is_admin %} {% ifequal user member %}<em>This is you</em>{% else %}<a href="{% url usergroups_remove_member group.pk, member.pk %}">Remove from group</a> <a href="{% url usergroups_add_admin group.id member.id %}">Make admin</a>{% endifequal %}{% endif %}</li>
+    <li>{{ member.get_full_name|default:member.username }}{% if is_admin %} {% ifequal user member %}<em>This is you</em>{% else %}<a href="{% url usergroups_remove_member group_config.slug group.pk member.pk %}">Remove from group</a> <a href="{% url usergroups_add_admin group.id member.id %}">Make admin</a>{% endifequal %}{% endif %}</li>
     {% endfor %}
 </ul>
 {% endif %}
