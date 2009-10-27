@@ -147,17 +147,9 @@ True
 >>> r.status_code
 302
 
+# Edit group
 >>> g.admins.count()
 1
-
-# Delete group
->>> r = get(c1, 'usergroups_delete_group',
-...         { 'slug': 'test', 'group_id': g.pk })
->>> r.status_code
-200
-
->>> Group.objects.count()
-0
 
 >>> g.name
 'group'
@@ -171,6 +163,22 @@ True
 >>> g = Group.objects.get(pk=1)
 >>> g.name
 u'Group'
+
+# Delete group
+>>> r = get(c1, 'usergroups_delete_group',
+...         { 'slug': 'test', 'group_id': g.pk })
+>>> r.status_code
+200
+
+>>> r = post(c1, 'usergroups_delete_group',
+...          {},
+...          { 'slug': 'test', 'group_id': g.pk })
+>>> r.status_code
+302
+
+>>> Group.objects.count()
+1
+
 
 # TEST: Auto assign creator and admins.
 # TEST: JSON responses.

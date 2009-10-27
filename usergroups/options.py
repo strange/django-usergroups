@@ -155,7 +155,8 @@ class BaseUserGroupConfiguration(object):
 
         if request.method == "POST":
             group.delete()
-            return http.HttpResponseRedirect(reverse('usergroups_delete_group_done'))
+            return http.HttpResponseRedirect(reverse('usergroups_delete_group_done',
+                                                     args=(self.slug, )))
 
         extra_context = extra_context or {}
         extra_context.update({ 'group': group })

@@ -47,7 +47,7 @@ p = (
         'usergroups.views.edit_group', name='usergroups_edit_group'),
     url(r'^(?P<slug>\w+)/(?P<group_id>\d+)/delete/$', 'usergroups.views.delete_group',
         name='usergroups_delete_group'),
-    url(r'^group-deleted/$', 'django.views.generic.simple.direct_to_template',
+    url(r'^(?P<slug>\w+)/group-deleted/$', 'django.views.generic.simple.direct_to_template',
         { 'template': 'usergroups/delete_group_done.html' },
         name='usergroups_delete_group_done')
 )
