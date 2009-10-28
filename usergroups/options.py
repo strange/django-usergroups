@@ -19,7 +19,6 @@ from usergroups.models import UserGroupInvitation
 # TODO: Deal with extra context
 # TODO: Check admin permissions.
 # TODO: Template names as class vars.
-# TODO: POST instead of GET for views changing the state of app.
 
 if "notification" in settings.INSTALLED_APPS and \
    hasattr(settings, 'USERGROUPS_SEND_NOTIFICATIONS') and \
@@ -44,7 +43,7 @@ class BaseUserGroupConfiguration(object):
     def __init__(self, slug, model):
         # Make sure that we're extending BaseUserGroup. (This isn't strictly
         # necessary as we're really only interested in the save-logic and the
-        # admins m2m, but it's easier than checking and explaining)
+        # m2m relations, but it's easier than checking and explaining).
         if not issubclass(model, BaseUserGroup):
             raise ValueError(("The model used in usergroups must extend "
                               "BaseUserGroup."))
@@ -53,7 +52,7 @@ class BaseUserGroupConfiguration(object):
         self.model = model
 
     def has_permission(self, user, group):
-        return user in group.admins.all()
+        return user == group.creator or user in group.admins.all()
 
     # Forms
 
@@ -67,7 +66,11 @@ class BaseUserGroupConfiguration(object):
     # Views
 
     def group_list(self, request, queryset=None, extra_context=None):
-        """A paginated list of groups."""
+        """Present the visitor with a paginated list of groups.
+        
+        A custom `QuerySet` can be supplied via the ``queryset`` argument.
+
+        """
         if queryset is None:
             queryset = self.model.objects.all().select_related()
             queryset = queryset.order_by(self.order_groups_by)
@@ -79,7 +82,10 @@ class BaseUserGroupConfiguration(object):
                                        template_name=self.list_template_name)
 
     def group_detail(self, request, group_id, extra_context=None):
-        """List of members in a group, information and management."""
+        """Present the user with a detailed view of a group and a paginated
+        list of members.
+        
+        """
         group = get_object_or_404(self.model, pk=group_id)
 
         queryset = group.members.all().select_related()
@@ -105,13 +111,13 @@ class BaseUserGroupConfiguration(object):
 
     @login_required
     def create_group(self, request, extra_context=None):
-        """Create a new group. The requesting user will be set as the creator
-        (and subsequently an admin in the underlying interface).
+        """Allow user to create a group. The requesting user will be set as the
+        `creator` (and added as an admin in the model-level logic).
 
         """
         instance = self.model(creator=request.user)
-        form_class = self.get_create_group_form()
 
+        form_class = self.get_create_group_form()
         form = form_class(request.POST or None, request.FILES or None,
                           instance=instance)
 
@@ -129,18 +135,24 @@ class BaseUserGroupConfiguration(object):
 
     @login_required
     def edit_group(self, request, group_id, extra_context=None):
-        """Edit an existing user group.
-
+        """Allow user with administrative privileges to edit a existing
+        group.
+        
         """
         instance = get_object_or_404(self.model, pk=group_id)
-        form_class = self.get_edit_group_form()
 
+        if not self.has_permission(request.user, instance):
+            return http.HttpResponseBadRequest()
+
+        form_class = self.get_edit_group_form()
         form = form_class(request.POST or None, request.FILES or None,
                           instance=instance)
+
         if form.is_valid():
             instance = form.save()
-            return http.HttpResponseRedirect(reverse('usergroups_group_detail',
-                                                     args=(self.slug, instance.pk)))
+            url = reverse('usergroups_group_detail',
+                          args=(self.slug, instance.pk))
+            return http.HttpResponseRedirect(url)
 
         extra_context = extra_context or None
         extra_context.update({ 'form': form })
@@ -149,6 +161,15 @@ class BaseUserGroupConfiguration(object):
                                   template=self.edit_group_template_name)
 
     def confirmation(self, request, group, action, extra_context=None):
+        """Simple helper-view that should present the visitor with a form
+        that can be used to perform a POST-request when such is required
+        by the original view.
+        
+        The ``action`` argument contains a string used to identify the
+        original view in the template (typically to generate sane
+        instructions).
+
+        """
         extra_context = extra_context or {}
         extra_context.update({ 'group': group, 'action': action })
         return direct_to_template(request, extra_context=extra_context,
@@ -156,8 +177,14 @@ class BaseUserGroupConfiguration(object):
 
     @login_required
     def delete_group(self, request, group_id, extra_context=None):
-        """Delete an existing group and render a template."""
+        """Allow a user with administrative privileges to delete an existing
+        group.
+        
+        """
         group = get_object_or_404(self.model, pk=group_id)
+
+        if not self.has_permission(request.user, group):
+            return http.HttpResponseBadRequest()
 
         if request.method != 'POST':
             return self.confirmation(request, group, 'delete')
@@ -172,8 +199,8 @@ class BaseUserGroupConfiguration(object):
 
     @login_required
     def remove_member(self, request, group_id, user_id, extra_context=None):
-        """Remove a member from the group. Also removes the user from the list
-        of admins if applicable.
+        """Allow a user with administrative privileges to remove a member from
+        the group. Also removes the user from the list of admins if applicable.
 
         Will return a JSON serialized dict if called with headers picked up by
         ``is_ajax()``.
@@ -181,6 +208,9 @@ class BaseUserGroupConfiguration(object):
         """
         member = get_object_or_404(User, pk=user_id)
         group = get_object_or_404(self.model, pk=group_id)
+
+        if not self.has_permission(request.user, group):
+            return http.HttpResponseBadRequest()
 
         if member == request.user:
             url = reverse('usergroups_leave_group', args=(self.slug, group.pk))
@@ -206,12 +236,15 @@ class BaseUserGroupConfiguration(object):
 
     @login_required
     def add_admin(self, request, group_id, user_id, extra_context={}):
-        """Add a user to the list of users with administrative privilegies in a
-        group.
+        """Allow a user with administrative privileges to make another user
+        admin of group.
 
         """
         group = get_object_or_404(self.model, pk=group_id)
         member = get_object_or_404(User, pk=user_id)
+
+        if not self.has_permission(request.user, group):
+            return http.HttpResponseBadRequest()
 
         if request.method != 'POST':
             extra_context = { 'member': member }
@@ -219,8 +252,6 @@ class BaseUserGroupConfiguration(object):
                                      extra_context)
 
         group.admins.add(member)
-
-        # The interface should prevent this from ever being needed.
         if member not in group.members.all():
             group.members.add(member)
 
@@ -229,7 +260,8 @@ class BaseUserGroupConfiguration(object):
 
     @login_required
     def revoke_admin(self, request, group_id, user_id, extra_context={}):
-        """Revoke an admins's administrative privilegies in a group.
+        """Allow a user with administrative privileges to remove a user from
+        the list of admins in group.
 
         Will return a JSON serialized dict if called with headers picked up by
         ``is_ajax()``.
@@ -237,6 +269,9 @@ class BaseUserGroupConfiguration(object):
         """
         group = get_object_or_404(self.model, pk=group_id)
         member = get_object_or_404(User, pk=user_id)
+
+        if not self.has_permission(request.user, group):
+            return http.HttpResponseBadRequest()
 
         if request.method != 'POST':
             extra_context = { 'member': member }
@@ -270,7 +305,8 @@ class BaseUserGroupConfiguration(object):
         if request.method != 'POST':
             return self.confirmation(request, group, 'leave_group')
 
-        if group.admins.count() <= 1 and request.user in group.admins.all():
+        # TODO: We should have a "cannot leave group"-view for this situation.
+        if group.admins.count() == 1 and request.user in group.admins.all():
             url = reverse('usergroups_delete_group',
                           args=(self.slug, group.pk))
             return http.HttpResponseRedirect(url)
@@ -293,18 +329,21 @@ class BaseUserGroupConfiguration(object):
 
     @login_required
     def create_email_invitation(self, request, group_id, extra_context=None):
-        """Create and send an invitation to a ``UserGroup`` via e-mail."""
+        """Allow a user with administrative privileges to create and send an
+        invitation to join group via e-mail.
+        
+        """
         group = get_object_or_404(self.model, pk=group_id)
-        if request.method == 'POST':
-            form = EmailInvitationForm(user=request.user, group=group,
-                                       data=request.POST)
-            if form.is_valid():
-                form.send_invitations(self.slug)
-                url = reverse('usergroups_group_detail',
-                              args=(self.slug, group.pk))
-                return http.HttpResponseRedirect(url)
-        else:
-            form = EmailInvitationForm(user=request.user, group=group)
+
+        if not self.has_permission(request.user, group):
+            return http.HttpResponseBadRequest()
+
+        form = EmailInvitationForm(user=request.user, group=group,
+                                   data=request.POST or None)
+        if form.is_valid():
+            form.send_invitations(self.slug)
+            url = reverse('usergroups_group_detail', args=(self.slug, group.pk))
+            return http.HttpResponseRedirect(url)
 
         return direct_to_template(request, extra_context=locals(),
                                          template='usergroups/create_email_invitation.html')
@@ -312,7 +351,7 @@ class BaseUserGroupConfiguration(object):
     @login_required
     def validate_email_invitation(self, request, group_id, key,
                                   extra_context=None):
-        """Validate an invitation."""
+        """Allow a user to Validate an ``EmailInvitation``."""
         group = get_object_or_404(self.model, pk=group_id)
         try:
             # TODO: Search on group as well.
@@ -326,6 +365,7 @@ class BaseUserGroupConfiguration(object):
             invitations.delete()
 
         group.members.add(request.user)
+
         return http.HttpResponseRedirect(reverse('usergroups_group_joined',
                                                  args=(self.slug, group.pk)))
 
@@ -338,7 +378,8 @@ class BaseUserGroupConfiguration(object):
     @login_required
     def approve_application(self, request, group_id, application_id,
                             extra_context=None):
-        """Approve an application.
+        """Allow a user with administrative privileges to approve an
+        application to join group.
 
         Will return a JSON serialized dict if called with headers picked up by
         ``is_ajax()``.
@@ -346,6 +387,9 @@ class BaseUserGroupConfiguration(object):
         """
         group = get_object_or_404(self.model, pk=group_id)
         application = get_object_or_404(UserGroupApplication, pk=application_id)
+
+        if not self.has_permission(request.user, group):
+            return http.HttpResponseBadRequest()
 
         if request.method != 'POST':
             extra_context = { 'application': application }
@@ -383,7 +427,8 @@ class BaseUserGroupConfiguration(object):
     @login_required
     def ignore_application(self, request, group_id, application_id,
                            extra_context=None):
-        """Reject an application.
+        """Allow a user with administrative privileges to silently reject an
+        application.
 
         Will return a JSON serialized dict if called with headers picked up by
         ``is_ajax()``.
@@ -391,6 +436,9 @@ class BaseUserGroupConfiguration(object):
         """
         group = get_object_or_404(self.model, pk=group_id)
         application = get_object_or_404(UserGroupApplication, pk=application_id)
+
+        if not self.has_permission(request.user, group):
+            return http.HttpResponseBadRequest()
 
         if request.method != 'POST':
             extra_context = { 'application': application }
@@ -414,7 +462,7 @@ class BaseUserGroupConfiguration(object):
 
     @login_required
     def apply_to_join_group(self, request, group_id, extra_context=None):
-        """Allow a user to apply to join a user group.
+        """Allow a user to apply to join group.
 
         Will return a JSON serialized dict if called with headers picked up by
         ``is_ajax()``.
