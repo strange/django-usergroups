@@ -14,7 +14,6 @@ from usergroups.decorators import group_admin_required
 from usergroups.forms import EmailInvitationForm
 from usergroups.models import EmailInvitation
 from usergroups.models import UserGroupApplication
-from usergroups.models import UserGroupInvitation
 
 # TODO: Deal with extra context
 # TODO: Check admin permissions.

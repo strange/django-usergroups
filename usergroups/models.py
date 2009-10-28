@@ -1,6 +1,6 @@
 import datetime
 import random
-import sha
+import hashlib
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -73,25 +73,6 @@ class UserGroupApplication(BaseGroupRelation):
         return '%s applied to join %s' % (self.user.get_full_name(),
                                           self.group.name)
 
-class UserGroupInvitation(BaseGroupRelation):
-    """An invitation to join a user group."""
-    user = models.ForeignKey(User)
-    secret_key = models.CharField(max_length=30)
-    created = models.DateTimeField(default=datetime.datetime.now)
-    
-    objects = UserGroupInvitationManager()
-    
-    def generate_secret_key(self):
-        """Generate a secret key."""
-        # Stolen from James Bennet! Oh my!
-        salt = sha.new(str(random.random())).hexdigest()[:5]
-        return sha.new(salt + user.username).hexdigest()
-    
-    def save(self, *args, **kwargs):
-        if self.secret_key is None:
-            self.secret_key = self.generate_secret_key()
-        super(UserGroupInvitation, self).save(*args, **kwargs)
-
 
 class EmailInvitation(BaseGroupRelation):
     """An invitation to join a user group."""
@@ -104,9 +85,8 @@ class EmailInvitation(BaseGroupRelation):
     
     def generate_secret_key(self):
         """Generate a secret key."""
-        # Stolen from James Bennet! Oh my!
-        salt = sha.new(str(random.random())).hexdigest()[:5]
-        return sha.new(salt + self.user.username).hexdigest()[:30]
+        salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
+        return hashlib.sha1(salt + self.user.username).hexdigest()[:30]
     
     def save(self, *args, **kwargs):
         if not self.secret_key:
