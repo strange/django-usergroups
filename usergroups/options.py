@@ -39,7 +39,7 @@ class BaseUserGroupConfiguration(object):
     detail_template_name = 'usergroups/group_detail.html'
     create_group_template_name = 'usergroups/group_form.html'
     edit_group_template_name = 'usergroups/group_form.html'
-    delete_group_confirm_template_name = 'usergroups/delete_group_confirm.html'
+    confirm_action_template_name = 'usergroups/confirm_action.html'
 
     def __init__(self, slug, model):
         # Make sure that we're extending BaseUserGroup. (This isn't strictly
@@ -148,22 +148,25 @@ class BaseUserGroupConfiguration(object):
         return direct_to_template(request, extra_context=extra_context,
                                   template=self.edit_group_template_name)
 
+    def confirmation(self, request, group, action, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context.update({ 'group': group, 'action': action })
+        return direct_to_template(request, extra_context=extra_context,
+                                  template=self.confirm_action_template_name)
+
     @login_required
     def delete_group(self, request, group_id, extra_context=None):
         """Delete an existing group and render a template."""
         group = get_object_or_404(self.model, pk=group_id)
 
-        if request.method == "POST":
-            group.delete()
-            return http.HttpResponseRedirect(reverse('usergroups_delete_group_done',
-                                                     args=(self.slug, )))
+        if request.method != 'POST':
+            return self.confirmation(request, group, 'delete')
 
-        extra_context = extra_context or {}
-        extra_context.update({ 'group': group })
+        group_id = group.pk
+        group.delete()
 
-        template_name = self.delete_group_confirm_template_name
-        return direct_to_template(request, extra_context=extra_context,
-                                  template=template_name)
+        url = reverse('usergroups_delete_group_done', args=(self.slug, ))
+        return http.HttpResponseRedirect(url)
 
     # Manage members and admins
 
@@ -176,20 +179,27 @@ class BaseUserGroupConfiguration(object):
         ``is_ajax()``.
 
         """
-        user = get_object_or_404(User, pk=user_id)
-        if user == request.user:
-            return http.HttpResponseRedirect(reverse('usergroups_leave_group',
-                                                args=[group.pk]))
+        member = get_object_or_404(User, pk=user_id)
         group = get_object_or_404(self.model, pk=group_id)
-        group.remove_admin(user)
-        group.members.remove(user)
+
+        if member == request.user:
+            url = reverse('usergroups_leave_group', args=(self.slug, group.pk))
+            return http.HttpResponseRedirect(url)
+
+        if request.method != 'POST':
+            extra_context = { 'member': member }
+            return self.confirmation(request, group, 'delete', extra_context)
+
+        group.remove_admin(member)
+        group.members.remove(member)
+
         if request.is_ajax():
             response = {
-                'message': 'Member removed from group',
+                'message': "Member removed from group",
                 'user_id': user.id,
             }
             return http.HttpResponse(simplejson.dumps(json_response),
-                                mimetype='application/javascript')
+                                     mimetype='application/javascript')
 
         return http.HttpResponseRedirect(reverse('usergroups_group_detail',
                                                  args=(self.slug, group.pk)))
@@ -201,12 +211,19 @@ class BaseUserGroupConfiguration(object):
 
         """
         group = get_object_or_404(self.model, pk=group_id)
-        user = get_object_or_404(User, pk=user_id)
-        group.admins.add(user)
+        member = get_object_or_404(User, pk=user_id)
+
+        if request.method != 'POST':
+            extra_context = { 'member': member }
+            return self.confirmation(request, group, 'add_admin',
+                                     extra_context)
+
+        group.admins.add(member)
 
         # The interface should prevent this from ever being needed.
-        if user not in group.members.all():
-            group.members.add(user)
+        if member not in group.members.all():
+            group.members.add(member)
+
         return http.HttpResponseRedirect(reverse('usergroups_group_detail',
                                                  args=(self.slug, group.pk)))
 
@@ -219,12 +236,19 @@ class BaseUserGroupConfiguration(object):
 
         """
         group = get_object_or_404(self.model, pk=group_id)
-        user = get_object_or_404(User, pk=user_id)
-        group.remove_admin(user)
+        member = get_object_or_404(User, pk=user_id)
+
+        if request.method != 'POST':
+            extra_context = { 'member': member }
+            return self.confirmation(request, group, 'revoke_admin',
+                                     extra_context)
+
+        group.remove_admin(member)
+
         if request.is_ajax():
             response = {
                 'message': 'Admin rights for user revoked',
-                'user_id': user.pk,
+                'user_id': member.pk,
             }
             return http.HttpResponse(simplejson.dumps(json_response),
                                 mimetype='application/javascript')
@@ -243,9 +267,13 @@ class BaseUserGroupConfiguration(object):
         """
         group = get_object_or_404(self.model, pk=group_id)
 
+        if request.method != 'POST':
+            return self.confirmation(request, group, 'leave_group')
+
         if group.admins.count() <= 1 and request.user in group.admins.all():
-            return HttpResponseRedirect(reverse('usergroups_delete_group',
-                                                args=(self.slug, group.pk)))
+            url = reverse('usergroups_delete_group',
+                          args=(self.slug, group.pk))
+            return http.HttpResponseRedirect(url)
 
         group.remove_admin(request.user)
         group.members.remove(request.user)
@@ -318,6 +346,12 @@ class BaseUserGroupConfiguration(object):
         """
         group = get_object_or_404(self.model, pk=group_id)
         application = get_object_or_404(UserGroupApplication, pk=application_id)
+
+        if request.method != 'POST':
+            extra_context = { 'application': application }
+            return self.confirmation(request, group, 'approve_application',
+                                     extra_context)
+
         group.members.add(application.user)
         application_id = application.id
 
@@ -357,6 +391,12 @@ class BaseUserGroupConfiguration(object):
         """
         group = get_object_or_404(self.model, pk=group_id)
         application = get_object_or_404(UserGroupApplication, pk=application_id)
+
+        if request.method != 'POST':
+            extra_context = { 'application': application }
+            return self.confirmation(request, group, 'ignore_application',
+                                     extra_context)
+
         application_id = application.pk
         application.delete()
 
@@ -367,8 +407,7 @@ class BaseUserGroupConfiguration(object):
                 'application_id': application_id,
             }
             return http.HttpResponse(simplejson.dumps(json_response),
-                                mimetype='application/javascript')
-
+                                     mimetype='application/javascript')
 
         return http.HttpResponseRedirect(reverse('usergroups_group_detail',
                                                  args=(self.slug, group.pk)))
@@ -382,6 +421,10 @@ class BaseUserGroupConfiguration(object):
 
         """
         group = get_object_or_404(self.model, pk=group_id)
+
+        if request.method != 'POST':
+            return self.confirmation(request, group, extra_context)
+
         already_member = request.user in group.members.all()
         if not already_member:
             try:
@@ -400,7 +443,8 @@ class BaseUserGroupConfiguration(object):
                     'group': group,
                 }
                 if notification:
-                    notification.send(group.admins.all(), 'usergroups_application', context)
+                    notification.send(group.admins.all(),
+                                      'usergroups_application', context)
 
         extra_context = { 'group': group, 'already_member': already_member }
 
@@ -409,8 +453,8 @@ class BaseUserGroupConfiguration(object):
                 'message': already_member and 'You\'re already a member of group' or 'Application sent',
                 'already_member': already_member,
             }
-            return HttpResponse(simplejson.dumps(json_response),
-                                mimetype='application/javascript')
+            return http.HttpResponse(simplejson.dumps(json_response),
+                                     mimetype='application/javascript')
 
         return direct_to_template(request, extra_context=extra_context,
                                          template='usergroups/application.html')

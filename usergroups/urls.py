@@ -6,7 +6,7 @@ p = (
     url(r'^(?P<slug>\w+)/(?P<group_id>\d+)/$',
         'usergroups.views.group_detail', name='usergroups_group_detail'),
     
-    ## Members
+    # Members
     url(r'^(?P<slug>\w+)/(?P<group_id>\d+)/leave/$',
         'usergroups.views.leave_group', name='usergroups_leave_group'),
     url(r'^(?P<slug>\w+)/(?P<group_id>\d+)/members/(?P<user_id>\d+)/remove/$',
