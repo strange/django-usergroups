@@ -62,6 +62,11 @@ True
 >>> g.members.count()
 1
 
+>>> r = get(c2, 'usergroups_create_email_invitation',
+...         { 'slug': 'test', 'group_id': g.pk })
+>>> r.status_code # user w/o administrative privileges
+400
+
 >>> r = get(c1, 'usergroups_create_email_invitation',
 ...         { 'slug': 'test', 'group_id': g.pk })
 >>> r.status_code
@@ -89,8 +94,7 @@ True
 2
 
 # Members
->>> r = post(c2, 'usergroups_leave_group',
-...          {},
+>>> r = post(c2, 'usergroups_leave_group', {},
 ...          { 'slug': 'test', 'group_id': g.pk })
 >>> r.status_code
 302
@@ -99,6 +103,11 @@ True
 1
 
 >>> g.members.add(u2)
+
+>>> r = post(c2, 'usergroups_remove_member', {},
+...          { 'slug': 'test', 'group_id': g.pk, 'user_id': u2.pk })
+>>> r.status_code # user w/o administrative privileges
+400
 
 >>> r = post(c1, 'usergroups_remove_member',
 ...          {},
@@ -110,30 +119,31 @@ True
 1
 
 # Applications
->>> r = post(c2, 'usergroups_apply_to_join',
-...          {},
+>>> r = post(c2, 'usergroups_apply_to_join', {},
 ...          { 'slug': 'test', 'group_id': g.pk })
 >>> r.status_code
 200
 
 >>> application = UserGroupApplication.objects.get(pk=1)
 
->>> r = post(c1, 'usergroups_ignore_application',
-...          {},
+>>> r = post(c2, 'usergroups_ignore_application', {},
+...          { 'slug': 'test', 'group_id': g.pk, 'application_id': application.pk })
+>>> r.status_code # user w/o administrative privileges
+400
+
+>>> r = post(c1, 'usergroups_ignore_application', {},
 ...          { 'slug': 'test', 'group_id': g.pk, 'application_id': application.pk })
 >>> r.status_code
 302
 
->>> r = post(c2, 'usergroups_apply_to_join',
-...          {},
+>>> r = post(c2, 'usergroups_apply_to_join', {},
 ...          { 'slug': 'test', 'group_id': g.pk })
 >>> r.status_code
 200
 
 >>> application = UserGroupApplication.objects.get(pk=1)
 
->>> r = post(c1, 'usergroups_approve_application',
-...          {},
+>>> r = post(c1, 'usergroups_approve_application', {},
 ...          { 'slug': 'test', 'group_id': g.pk, 'application_id': application.pk })
 >>> r.status_code
 302
@@ -145,8 +155,12 @@ True
 >>> r.status_code
 200
 
->>> r = post(c1, 'usergroups_add_admin',
-...          {},
+>>> r = post(c2, 'usergroups_add_admin', {},
+...          { 'slug': 'test', 'group_id': g.pk, 'user_id': u2.pk })
+>>> r.status_code
+400
+
+>>> r = post(c1, 'usergroups_add_admin', {},
 ...          { 'slug': 'test', 'group_id': g.pk, 'user_id': u2.pk })
 >>> r.status_code
 302
@@ -154,11 +168,15 @@ True
 >>> g.admins.count()
 2
 
->>> r = post(c1, 'usergroups_revoke_admin',
-...          {},
+>>> r = post(c1, 'usergroups_revoke_admin', {},
 ...          { 'slug': 'test', 'group_id': g.pk, 'user_id': u2.pk })
 >>> r.status_code
 302
+
+>>> r = post(c2, 'usergroups_revoke_admin', {},
+...          { 'slug': 'test', 'group_id': g.pk, 'user_id': u2.pk })
+>>> r.status_code
+400
 
 # Edit group
 >>> g.admins.count()
@@ -166,6 +184,12 @@ True
 
 >>> g.name
 'group'
+
+>>> r = post(c2, 'usergroups_edit_group',
+...          { 'name': 'Group', 'extra': 'extra stuff' },
+...          { 'slug': 'test', 'group_id': g.pk })
+>>> r.status_code
+400
 
 >>> r = post(c1, 'usergroups_edit_group',
 ...          { 'name': 'Group', 'extra': 'extra stuff' },
@@ -183,8 +207,12 @@ u'Group'
 >>> r.status_code
 200
 
->>> r = post(c1, 'usergroups_delete_group',
-...          {},
+>>> r = post(c2, 'usergroups_delete_group', {},
+...          { 'slug': 'test', 'group_id': g.pk })
+>>> r.status_code
+400
+
+>>> r = post(c1, 'usergroups_delete_group', {},
 ...          { 'slug': 'test', 'group_id': g.pk })
 >>> r.status_code
 302
