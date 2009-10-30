@@ -35,10 +35,6 @@ class BaseUserGroup(models.Model):
             self.creator = self.admins.all().order_by('?')[0]
             self.save()
     
-    def is_admin(self, user):
-        """Test if supplied user is an admin (or the creator) of group."""
-        return user == self.creator or user in self.admins.all()
-    
     def save(self, *args, **kwargs):
         """Override to set add the creator as an admin and member."""
         created = self.pk is None

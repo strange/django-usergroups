@@ -72,8 +72,8 @@ class BaseUserGroupConfiguration(object):
 
     def __init__(self, slug, model):
         # Make sure that we're extending BaseUserGroup. (This isn't strictly
-        # necessary as we're really only interested in the save-logic and the
-        # m2m relations, but it's easier than checking and explaining).
+        # necessary, but it's easier than checking attribute availability and
+        # explaining).
         if not issubclass(model, BaseUserGroup):
             raise ValueError(("The model used in usergroups must extend "
                               "BaseUserGroup."))
@@ -81,8 +81,8 @@ class BaseUserGroupConfiguration(object):
         self.slug = slug
         self.model = model
 
-    def has_permission(self, user, group):
-        return user == group.creator or user in group.admins.all()
+    def is_admin(self, user, group):
+        return user == group.creator or group.admins.filter(pk=user.pk)
 
     # Forms
 
@@ -125,9 +125,9 @@ class BaseUserGroupConfiguration(object):
         queryset = queryset.order_by(self.order_members_by)
 
         extra_context = extra_context or {}
-        is_admin = group.is_admin(request.user)
+        is_admin = self.is_admin(request.user, group)
         is_owner = request.user == group.creator
-        is_member = is_admin or request.user in group.members.all()
+        is_member = is_admin or group.members.filter(pk=request.user.pk)
 
         application_list = None
         if is_admin:
@@ -181,7 +181,7 @@ class BaseUserGroupConfiguration(object):
         """
         instance = get_object_or_404(self.model, pk=group_id)
 
-        if not self.has_permission(request.user, instance):
+        if not self.is_admin(request.user, instance):
             return http.HttpResponseBadRequest()
 
         form_class = self.get_edit_group_form()
@@ -208,7 +208,7 @@ class BaseUserGroupConfiguration(object):
         """
         group = get_object_or_404(self.model, pk=group_id)
 
-        if not self.has_permission(request.user, group):
+        if not self.is_admin(request.user, group):
             return http.HttpResponseBadRequest()
 
         if request.method != 'POST':
@@ -270,7 +270,7 @@ class BaseUserGroupConfiguration(object):
         member = get_object_or_404(User, pk=user_id)
         group = get_object_or_404(self.model, pk=group_id)
 
-        if not self.has_permission(request.user, group):
+        if not self.is_admin(request.user, group):
             return http.HttpResponseBadRequest()
 
         if member == request.user:
@@ -324,7 +324,7 @@ class BaseUserGroupConfiguration(object):
         group = get_object_or_404(self.model, pk=group_id)
         member = get_object_or_404(User, pk=user_id)
 
-        if not self.has_permission(request.user, group):
+        if not self.is_admin(request.user, group):
             return http.HttpResponseBadRequest()
 
         extra_context = extra_context or {}
@@ -375,7 +375,7 @@ class BaseUserGroupConfiguration(object):
         group = get_object_or_404(self.model, pk=group_id)
         member = get_object_or_404(User, pk=user_id)
 
-        if not self.has_permission(request.user, group):
+        if not self.is_admin(request.user, group):
             return http.HttpResponseBadRequest()
 
         extra_context = extra_context or None
@@ -423,7 +423,7 @@ class BaseUserGroupConfiguration(object):
         """
         group = get_object_or_404(self.model, pk=group_id)
 
-        if not self.has_permission(request.user, group):
+        if not self.is_admin(request.user, group):
             return http.HttpResponseBadRequest()
 
         form_class = self.get_email_invitation_form()
@@ -530,7 +530,7 @@ class BaseUserGroupConfiguration(object):
         application = get_object_or_404(UserGroupApplication, pk=application_id)
         applicant = application.user
 
-        if not self.has_permission(request.user, group):
+        if not self.is_admin(request.user, group):
             return http.HttpResponseBadRequest()
 
         extra_context = extra_context or {}
@@ -581,7 +581,7 @@ class BaseUserGroupConfiguration(object):
         application = get_object_or_404(UserGroupApplication, pk=application_id)
         applicant = application.user
 
-        if not self.has_permission(request.user, group):
+        if not self.is_admin(request.user, group):
             return http.HttpResponseBadRequest()
 
         extra_context = extra_context or {}
