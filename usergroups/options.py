@@ -10,7 +10,6 @@ from django.views.generic import list_detail
 from django.views.generic.simple import direct_to_template
 from django.contrib.contenttypes.models import ContentType
 
-from usergroups.decorators import group_admin_required
 from usergroups.forms import EmailInvitationForm
 from usergroups.models import BaseUserGroup
 from usergroups.models import EmailInvitation
