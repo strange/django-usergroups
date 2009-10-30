@@ -646,7 +646,6 @@ class BaseUserGroupConfiguration(object):
                                  mimetype='application/json')
 
 
-
 class ConfigurationAlreadyRegistered(Exception):
     pass
 
