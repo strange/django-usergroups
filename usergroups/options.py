@@ -645,11 +645,12 @@ class BaseUserGroupConfiguration(object):
     def json_done(self, request, action, data=None, group=None,
                   extra_context=None):
         extra_context = extra_context or {}
-        extra_context.update({
-            'group': group,
-            'group_name': group.name,
-            'action': action,
-        })
+        extra_context.update({ 'action': action })
+        if group is not None:
+            extra_context.update({
+                'group': group,
+                'group_name': group.name,
+            })
 
         data = data or {}
         data.update({
