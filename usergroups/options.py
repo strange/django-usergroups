@@ -35,6 +35,7 @@ class BaseUserGroupConfiguration(object):
     edit_group_template_name = 'usergroups/group_form.html'
     create_email_invitation_template_name = \
         'usergroups/create_email_invitation.html'
+    invalid_invitation_template_name = 'usergroups/invalid_invitation.html'
 
     confirm_action_template_name = 'usergroups/confirm_action.html'
     done_template_name = 'usergroups/done.html'
@@ -439,13 +440,15 @@ class BaseUserGroupConfiguration(object):
                                   extra_context=None):
         """Allow a user to Validate an ``EmailInvitation``."""
         group = get_object_or_404(self.model, pk=group_id)
+
         try:
             # TODO: Search on group as well.
             invitation = EmailInvitation.objects.get(secret_key=key)
             invitation.delete()
         except EmailInvitation.DoesNotExist:
+            template_name = self.invalid_invitation_template_name
             return direct_to_template(request,
-                                      template='usergroups/invalid_invitation.html')
+                                      template=template_name)
         except EmailInvitation.MultipleObjectsReturned:
             invitations = EmailInvitation.objects.filter(secret_key=key)
             invitations.delete()
