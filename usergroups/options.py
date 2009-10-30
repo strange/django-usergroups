@@ -1,4 +1,5 @@
 from django import http
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
@@ -7,11 +8,10 @@ from django.shortcuts import get_object_or_404
 from django.utils import simplejson
 from django.views.generic import list_detail
 from django.views.generic.simple import direct_to_template
-from django.conf import settings
 
-from usergroups.models import BaseUserGroup
 from usergroups.decorators import group_admin_required
 from usergroups.forms import EmailInvitationForm
+from usergroups.models import BaseUserGroup
 from usergroups.models import EmailInvitation
 from usergroups.models import UserGroupApplication
 
@@ -39,32 +39,32 @@ class BaseUserGroupConfiguration(object):
     confirm_action_template_name = 'usergroups/confirm_action.html'
     done_template_name = 'usergroups/done.html'
 
-    confirmtion_messages = {
-        'delete': u"Please confirm you want to delete %{group_name}.",
+    confirmation_messages = {
+        'delete': u"Please confirm you want to delete %(group_name)s.",
         'leave_group': (u"Please confirm that you want to leave the group "
-                        u"%{group_name}."),
+                        u"%(group_name)s."),
         'remove_member': (u"Please confirm that you wish to remove "
-                          u"%{member_name} from %{group_name}."),
-        'add_admin': (u"Please confirm that %{member_name} should be made "
-                      u"an administrator of %{group_name}."),
-        'revoke_admin': (u"Please confirm that %{member_name} should be "
+                          u"%(member_name} from %{group_name)s."),
+        'add_admin': (u"Please confirm that %(member_name)s should be made "
+                      u"an administrator of %(group_name)s."),
+        'revoke_admin': (u"Please confirm that %(member_name)s should be "
                          u"removed from the list of administrators of "
-                         u"%{group_name}."),
-        'apply_to_join': u"Do you want to apply to join %{group_name}?",
-        'approve_application': (u"Allow %{applicant_name} to join "
-                                u"%{group_name}."),
+                         u"%(group_name)s."),
+        'apply_to_join': u"Do you want to apply to join %(group_name)s?",
+        'approve_application': (u"Allow %(applicant_name)s to join "
+                                u"%(group_name)s."),
     }
 
     done_messages = {
         'delete_done': u"Group deleted.",
-        'leave_group_done': u"You have left the group %{group_name}.",
+        'leave_group_done': u"You have left the group %(group_name)s.",
         'remove_member_done': u"Member removed from group.",
         'add_admin_done': u"Admin added to group.",
         'revoke_admin_done': u"Admin removed from group.",
-        'group_joined': u"You have joined %{group_name}",
+        'group_joined': u"You have joined %(group_name)s",
         'email_invitation_done': u"invitation sent.",
         'application_sent': u"Application sent.",
-        'application_failed': u"You are already a member of %{group_name}.",
+        'application_failed': u"You are already a member of %(group_name)s.",
         'application_approved': u"Application approved.",
         'application_ignored': u"Application ignored.",
     }
@@ -318,20 +318,19 @@ class BaseUserGroupConfiguration(object):
         if not self.has_permission(request.user, group):
             return http.HttpResponseBadRequest()
 
+        extra_context = extra_context or {}
+        extra_context.update({
+            'member': member,
+            'member_name': member.get_full_name() or member.username,
+        })
+
         if request.method != 'POST':
-            extra_context = { 'member': member }
             return self.confirmation(request, 'add_admin', group, 
                                      extra_context)
 
         group.admins.add(member)
         if member not in group.members.all():
             group.members.add(member)
-
-        extra_context = extra_context or {}
-        extra_context.update({
-            'member': member,
-            'member_name': member.get_full_name() or member.username,
-        })
 
         if request.is_ajax():
             data = { 'user_id': member.id }
@@ -596,6 +595,22 @@ class BaseUserGroupConfiguration(object):
 
     # Helpers
 
+    def render_helper(self, request, action, group, message, template_name,
+                      extra_context=None):
+        extra_context = extra_context or {}
+        extra_context.update({
+            'action': action,
+        })
+        if group is not None:
+            extra_context.update({
+                'group': group,
+                'group_name': group.name,
+            })
+        message = message % extra_context
+        extra_context.update({ 'message': message })
+        return direct_to_template(request, extra_context=extra_context,
+                                  template=self.confirm_action_template_name)
+
     def confirmation(self, request, action, group, extra_context=None):
         """Simple helper-view that should present the visitor with a form
         that can be used to perform a POST-request when such is required
@@ -606,10 +621,10 @@ class BaseUserGroupConfiguration(object):
         instructions).
 
         """
-        extra_context = extra_context or {}
-        extra_context.update({ 'group': group, 'action': action })
-        return direct_to_template(request, extra_context=extra_context,
-                                  template=self.confirm_action_template_name)
+        message = self.confirmation_messages[action]
+        template_name = self.confirm_action_template_name
+        return self.render_helper(request, action, group, message,
+                                  template_name, extra_context)
 
     def done(self, request, action, group=None, extra_context=None):
         """Simple helper-view that should present the visitor with a message
@@ -619,14 +634,9 @@ class BaseUserGroupConfiguration(object):
         arguments.
         
         """
-        extra_context = extra_context or {}
-        extra_context.update({
-            'group': group,
-            'group_name': group.name,
-            'action': action,
-        })
-        return direct_to_template(request, extra_context=extra_context,
-                                  template=self.done_template_name)
+        message = self.done_messages[action]
+        return self.render_helper(request, action, group, message,
+                                  self.done_template_name, extra_context)
 
     def json_done(self, request, action, data=None, group=None,
                   extra_context=None):
@@ -639,7 +649,7 @@ class BaseUserGroupConfiguration(object):
 
         data = data or {}
         data.update({
-            'message': self.done_template_name[action] % extra_context,
+            'message': self.done_messages[action] % extra_context,
         })
 
         return http.HttpResponse(simplejson.dumps(data, ensure_ascii=False),
