@@ -44,7 +44,7 @@ p = (
     url(r'^(?P<slug>\w+)/(?P<group_id>\d+)/admins/(?P<user_id>\d+)/remove/$',
         dispatcher, { 'view_name': 'revoke_admin' },
         'usergroups_revoke_admin'),
-    url(r'^(?P<slug>\w+)/(?P<group_id>\d+)/admins/(?P<user_id>\d+)/remove/$',
+    url(r'^(?P<slug>\w+)/(?P<group_id>\d+)/admins/(?P<user_id>\d+)/removed/$',
         dispatcher, { 'view_name': 'revoke_admin_done' },
         'usergroups_revoke_admin_done'),
     

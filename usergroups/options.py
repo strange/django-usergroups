@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import simplejson
 from django.views.generic import list_detail
 from django.views.generic.simple import direct_to_template
+from django.contrib.contenttypes.models import ContentType
 
 from usergroups.decorators import group_admin_required
 from usergroups.forms import EmailInvitationForm
@@ -36,7 +37,6 @@ class BaseUserGroupConfiguration(object):
     create_email_invitation_template_name = \
         'usergroups/create_email_invitation.html'
     invalid_invitation_template_name = 'usergroups/invalid_invitation.html'
-
     confirm_action_template_name = 'usergroups/confirm_action.html'
     done_template_name = 'usergroups/done.html'
 
@@ -45,7 +45,7 @@ class BaseUserGroupConfiguration(object):
         'leave_group': (u"Please confirm that you want to leave the group "
                         u"%(group_name)s."),
         'remove_member': (u"Please confirm that you wish to remove "
-                          u"%(member_name} from %{group_name)s."),
+                          u"%(member_name)s from %(group_name)s."),
         'add_admin': (u"Please confirm that %(member_name)s should be made "
                       u"an administrator of %(group_name)s."),
         'revoke_admin': (u"Please confirm that %(member_name)s should be "
@@ -63,8 +63,9 @@ class BaseUserGroupConfiguration(object):
         'add_admin_done': u"Admin added to group.",
         'revoke_admin_done': u"Admin removed from group.",
         'group_joined': u"You have joined %(group_name)s",
-        'email_invitation_done': u"invitation sent.",
-        'application_sent': u"Application sent.",
+        'email_invitation_done': u"Invitation sent.",
+        'application_sent': (u"Your application to join %(group_name)s has "
+                             "been sent."),
         'application_failed': u"You are already a member of %(group_name)s.",
         'application_approved': u"Application approved.",
         'application_ignored': u"Application ignored.",
@@ -129,11 +130,18 @@ class BaseUserGroupConfiguration(object):
         is_owner = request.user == group.creator
         is_member = is_admin or request.user in group.members.all()
 
+        application_list = None
+        if is_admin:
+            ctype = ContentType.objects.get_for_model(self.model)
+            application_list = UserGroupApplication.objects.filter(
+                content_type=ctype, object_id=group.pk)
+
         extra_context.update({
             'group': group,
             'is_admin': is_admin,
             'is_owner': is_owner,
             'is_member': is_member,
+            'application_list': application_list,
         })
 
         return list_detail.object_list(request, queryset,
@@ -230,7 +238,7 @@ class BaseUserGroupConfiguration(object):
             return self.confirmation(request, 'leave_group', group)
 
         # TODO: We should have a "cannot leave group"-view for this situation.
-        if group.admins.count() == 1 and request.user in group.admins.all():
+        if group.admins.count() <= 1 and request.user in group.admins.all():
             url = reverse('usergroups_delete_group',
                           args=(self.slug, group.pk))
             return http.HttpResponseRedirect(url)
@@ -303,7 +311,8 @@ class BaseUserGroupConfiguration(object):
             'member': member,
             'member_name': member.get_full_name() or member.username,
         })
-        return self.done(request, 'remove_member_done', group, extra_context)
+        return self.done(request, 'remove_member_done', group=group,
+                         extra_context=extra_context)
 
     # Manage admins
 
@@ -352,7 +361,8 @@ class BaseUserGroupConfiguration(object):
             'member_name': member.get_full_name() or member.username,
         })
 
-        return self.done(request, 'add_admin_done', group, extra_context)
+        return self.done(request, 'add_admin_done', group=group,
+                         extra_context=extra_context)
 
     @login_required
     def revoke_admin(self, request, group_id, user_id, extra_context=None):
@@ -401,7 +411,8 @@ class BaseUserGroupConfiguration(object):
             'member_name': member.get_full_name() or member.username,
         })
 
-        return self.done(request, 'add_admin_done', group, extra_context)
+        return self.done(request, 'revoke_admin_done', group=group,
+                         extra_context=extra_context)
 
     # Invitations
 
@@ -477,7 +488,6 @@ class BaseUserGroupConfiguration(object):
         already_member = request.user in group.members.all()
 
         if not already_member:
-            from django.contrib.contenttypes.models import ContentType
             ctype = ContentType.objects.get_for_model(self.model)
             (application, created) = \
                 UserGroupApplication.objects.get_or_create(user=request.user,
@@ -614,7 +624,7 @@ class BaseUserGroupConfiguration(object):
         message = message % extra_context
         extra_context.update({ 'message': message })
         return direct_to_template(request, extra_context=extra_context,
-                                  template=self.confirm_action_template_name)
+                                  template=template_name)
 
     def confirmation(self, request, action, group, extra_context=None):
         """Simple helper-view that should present the visitor with a form
@@ -630,7 +640,8 @@ class BaseUserGroupConfiguration(object):
         return self.render_helper(request, action, group, message,
                                   template_name, extra_context)
 
-    def done(self, request, action, group=None, extra_context=None):
+    def done(self, request, action, group=None, group_id=None,
+             extra_context=None):
         """Simple helper-view that should present the visitor with a message
         letting him/her know that an action has been performed.
 
@@ -638,6 +649,8 @@ class BaseUserGroupConfiguration(object):
         arguments.
         
         """
+        if group is None and group_id is not None:
+            group = get_object_or_404(self.model, pk=group_id)
         message = self.done_messages[action]
         return self.render_helper(request, action, group, message,
                                   self.done_template_name, extra_context)

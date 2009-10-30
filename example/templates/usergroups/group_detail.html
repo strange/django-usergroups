@@ -7,11 +7,12 @@
 
 {% if is_admin %}
 <p><a href="{% url usergroups_delete_group group_config.slug group.id %}">Delete Group</a></p>
+<p><a href="{% url usergroups_edit_group group_config.slug group.id %}">Edit Group</a></p>
+{% if application_list %}
 <h2>Applications</h2>
-{% if group.usergroupapplication_set.count %}
 <ul>
-    {% for application in group.usergroupapplication_set.all %}
-    <li>{{ application.user.get_full_name }} <a href="{% url usergroups_approve_application group.id application.id %}">Approve</a></li>
+    {% for application in application_list %}
+    <li>{{ application.user.get_full_name|default:application.user.username }} <a href="{% url usergroups_approve_application group_config.slug group.id application.id %}">Approve</a></li>
     {% endfor %}
 </ul>
 {% endif %}
@@ -31,14 +32,14 @@
 {% endif %}
 
 {% if user.is_authenticated and not is_member %}
-<p><a href="{% url usergroups_apply_to_join group.id %}">Apply to join this group</a></p>
+<p><a href="{% url usergroups_apply_to_join group_config.slug group.id %}">Apply to join this group</a></p>
 {% endif %}
 
 <h2>Members</h2>
 {% if member_list.count %}
 <ul>
     {% for member in member_list %}
-    <li>{{ member.get_full_name|default:member.username }}{% if is_admin %} {% ifequal user member %}<em>This is you</em>{% else %}<a href="{% url usergroups_remove_member group_config.slug group.pk member.pk %}">Remove from group</a> <a href="{% url usergroups_add_admin group.id member.id %}">Make admin</a>{% endifequal %}{% endif %}</li>
+    <li>{{ member.get_full_name|default:member.username }}{% if is_admin %} {% ifequal user member %}<em>This is you</em>{% else %}<a href="{% url usergroups_remove_member group_config.slug group.pk member.pk %}">Remove from group</a> <a href="{% url usergroups_add_admin group_config.slug group.id member.id %}">Make admin</a>{% endifequal %}{% endif %}</li>
     {% endfor %}
 </ul>
 {% endif %}

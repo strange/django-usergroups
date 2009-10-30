@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Success{% endblock %}
+{% block bodyclass %}success{% endblock %}
+
+{% block content %}
+<h1>Success</h1>
+<p>{{ message }}</p>
+
+{% if group %}
+<p>Go to group: <a href="{% url usergroups_group_detail group_config.slug group.pk %}">{{ group.name }}</a></p>
+{% endif %}
+{% endblock %}

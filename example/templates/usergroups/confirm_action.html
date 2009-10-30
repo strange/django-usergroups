@@ -1,15 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}{% endblock %}
-{% block bodyclass %}{% endblock %}
+{% block title %}Confirmation{% endblock %}
+{% block bodyclass %}confirmation{% endblock %}
 
 {% block content %}
-    <h1>Confirmation</h1>
-    
-    <form action="." method="post" accept-charset="utf-8">
-        <p>
-            {% ifequal action 'delete' %}Confirm that you want to delete this group.{% endifequal %}
-        </p>
-        <p class="submit"><input type="submit" value="Confirm"><input type="hidden" name="placeholder" value="1"/></p>
-    </form>
+<h1>Confirmation</h1>
+
+<form action="." method="post" accept-charset="utf-8">
+    <p>{{ message }}</p>
+    <p class="submit"><input type="submit" value="Confirm"><input type="hidden" name="placeholder" value="1"/></p>
+</form>
 {% endblock %}
