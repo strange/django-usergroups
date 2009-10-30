@@ -648,7 +648,6 @@ class BaseUserGroupConfiguration(object):
         extra_context.update({ 'action': action })
         if group is not None:
             extra_context.update({
-                'group': group,
                 'group_name': group.name,
             })
 
