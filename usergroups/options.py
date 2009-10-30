@@ -15,9 +15,8 @@ from usergroups.forms import EmailInvitationForm
 from usergroups.models import EmailInvitation
 from usergroups.models import UserGroupApplication
 
-# TODO: Deal with extra context
-# TODO: Check admin permissions.
 # TODO: Template names as class vars.
+# TODO: Add "done"-views.
 
 if "notification" in settings.INSTALLED_APPS and \
    hasattr(settings, 'USERGROUPS_SEND_NOTIFICATIONS') and \
@@ -37,7 +36,41 @@ class BaseUserGroupConfiguration(object):
     detail_template_name = 'usergroups/group_detail.html'
     create_group_template_name = 'usergroups/group_form.html'
     edit_group_template_name = 'usergroups/group_form.html'
+    create_email_invitation_template_name = \
+        'usergroups/create_email_invitation.html'
+
     confirm_action_template_name = 'usergroups/confirm_action.html'
+    done_template_name = 'usergroups/done.html'
+
+    confirmtion_messages = {
+        'delete': u"Please confirm you want to delete %{group_name}.",
+        'leave_group': (u"Please confirm that you want to leave the group "
+                        u"%{group_name}."),
+        'remove_member': (u"Please confirm that you wish to remove "
+                          u"%{member_name} from %{group_name}."),
+        'add_admin': (u"Please confirm that %{member_name} should be made "
+                      u"an administrator of %{group_name}."),
+        'revoke_admin': (u"Please confirm that %{member_name} should be "
+                         u"removed from the list of administrators of "
+                         u"%{group_name}."),
+        'apply_to_join': u"Do you want to apply to join %{group_name}?",
+        'approve_application': (u"Allow %{applicant_name} to join "
+                                u"%{group_name}."),
+    }
+
+    done_messages = {
+        'delete_done': u"Group deleted.",
+        'leave_group_done': u"You have left the group %{group_name}.",
+        'remove_member_done': u"Member removed from group.",
+        'add_admin_done': u"Admin added to group.",
+        'revoke_admin_done': u"Admin removed from group.",
+        'group_joined': u"You have joined %{group_name}",
+        'email_invitation_done': u"invitation sent.",
+        'application_sent': u"Application sent.",
+        'application_failed': u"You are already a member of %{group_name}.",
+        'application_approved': u"Application approved.",
+        'application_ignored': u"Application ignored.",
+    }
 
     def __init__(self, slug, model):
         # Make sure that we're extending BaseUserGroup. (This isn't strictly
@@ -159,21 +192,6 @@ class BaseUserGroupConfiguration(object):
         return direct_to_template(request, extra_context=extra_context,
                                   template=self.edit_group_template_name)
 
-    def confirmation(self, request, group, action, extra_context=None):
-        """Simple helper-view that should present the visitor with a form
-        that can be used to perform a POST-request when such is required
-        by the original view.
-        
-        The ``action`` argument contains a string used to identify the
-        original view in the template (typically to generate sane
-        instructions).
-
-        """
-        extra_context = extra_context or {}
-        extra_context.update({ 'group': group, 'action': action })
-        return direct_to_template(request, extra_context=extra_context,
-                                  template=self.confirm_action_template_name)
-
     @login_required
     def delete_group(self, request, group_id, extra_context=None):
         """Allow a user with administrative privileges to delete an existing
@@ -186,7 +204,7 @@ class BaseUserGroupConfiguration(object):
             return http.HttpResponseBadRequest()
 
         if request.method != 'POST':
-            return self.confirmation(request, group, 'delete')
+            return self.confirmation(request, 'delete', group)
 
         group_id = group.pk
         group.delete()
@@ -194,7 +212,43 @@ class BaseUserGroupConfiguration(object):
         url = reverse('usergroups_delete_group_done', args=(self.slug, ))
         return http.HttpResponseRedirect(url)
 
-    # Manage members and admins
+    # Leave group
+
+    @login_required
+    def leave_group(self, request, group_id, extra_context=None):
+        """Allow a user to leave a group. Also removes the user from the list
+        of admins if applicable.
+
+        Will return a JSON serialized dict if called with headers picked up by
+        ``is_ajax()``.
+
+        """
+        group = get_object_or_404(self.model, pk=group_id)
+
+        if request.method != 'POST':
+            return self.confirmation(request, 'leave_group', group)
+
+        # TODO: We should have a "cannot leave group"-view for this situation.
+        if group.admins.count() == 1 and request.user in group.admins.all():
+            url = reverse('usergroups_delete_group',
+                          args=(self.slug, group.pk))
+            return http.HttpResponseRedirect(url)
+
+        group.remove_admin(request.user)
+        group.members.remove(request.user)
+
+        extra_context = extra_context or {}
+
+        if request.is_ajax():
+            data = { 'user_id': request.user.pk }
+            return self.json_done(request, 'leave_group_done', data, group,
+                                  extra_context)
+
+        url = reverse('usergroups_leave_group_done',
+                      args=(self.slug, group.pk))
+        return http.HttpResponseRedirect(url)
+
+    # Manage members
 
     @login_required
     def remove_member(self, request, group_id, user_id, extra_context=None):
@@ -215,26 +269,45 @@ class BaseUserGroupConfiguration(object):
             url = reverse('usergroups_leave_group', args=(self.slug, group.pk))
             return http.HttpResponseRedirect(url)
 
+        extra_context = extra_context or {}
+        extra_context.update({
+            'member': member,
+            'member_name': member.get_full_name() or member.username,
+        })
+
         if request.method != 'POST':
-            extra_context = { 'member': member }
-            return self.confirmation(request, group, 'delete', extra_context)
+            return self.confirmation(request, 'remove_member', group,
+                                     extra_context)
 
         group.remove_admin(member)
         group.members.remove(member)
 
         if request.is_ajax():
-            response = {
-                'message': "Member removed from group",
-                'user_id': user.id,
-            }
-            return http.HttpResponse(simplejson.dumps(json_response),
-                                     mimetype='application/javascript')
+            data = { 'user_id': member.id }
+            return self.json_done(request, 'remove_member_done',
+                                  data, group, extra_context)
 
-        return http.HttpResponseRedirect(reverse('usergroups_group_detail',
-                                                 args=(self.slug, group.pk)))
+        url = reverse('usergroups_remove_member_done',
+                      args=(self.slug, group.pk, member.pk))
+        return http.HttpResponseRedirect(url)
+
+    def remove_member_done(self, request, group_id, user_id,
+                           extra_context=None):
+        """Notify visitor that member has been removed from the group."""
+        group = get_object_or_404(self.model, pk=group_id)
+        member = get_object_or_404(User, pk=user_id)
+
+        extra_context = extra_context or {}
+        extra_context.update({
+            'member': member,
+            'member_name': member.get_full_name() or member.username,
+        })
+        return self.done(request, 'remove_member_done', group, extra_context)
+
+    # Manage admins
 
     @login_required
-    def add_admin(self, request, group_id, user_id, extra_context={}):
+    def add_admin(self, request, group_id, user_id, extra_context=None):
         """Allow a user with administrative privileges to make another user
         admin of group.
 
@@ -247,18 +320,42 @@ class BaseUserGroupConfiguration(object):
 
         if request.method != 'POST':
             extra_context = { 'member': member }
-            return self.confirmation(request, group, 'add_admin',
+            return self.confirmation(request, 'add_admin', group, 
                                      extra_context)
 
         group.admins.add(member)
         if member not in group.members.all():
             group.members.add(member)
 
-        return http.HttpResponseRedirect(reverse('usergroups_group_detail',
-                                                 args=(self.slug, group.pk)))
+        extra_context = extra_context or {}
+        extra_context.update({
+            'member': member,
+            'member_name': member.get_full_name() or member.username,
+        })
+
+        if request.is_ajax():
+            data = { 'user_id': member.id }
+            return self.json_done(request, 'add_admin_done',
+                                  data, group, extra_context)
+
+        url = reverse('usergroups_add_admin_done',
+                      args=(self.slug, group.pk, member.pk))
+        return http.HttpResponseRedirect(url)
+
+    def add_admin_done(self, request, group_id, user_id, extra_context=None):
+        group = get_object_or_404(self.model, pk=group_id)
+        member = get_object_or_404(User, pk=user_id)
+
+        extra_context = extra_context or None
+        extra_context.update({
+            'member': member,
+            'member_name': member.get_full_name() or member.username,
+        })
+
+        return self.done(request, 'add_admin_done', group, extra_context)
 
     @login_required
-    def revoke_admin(self, request, group_id, user_id, extra_context={}):
+    def revoke_admin(self, request, group_id, user_id, extra_context=None):
         """Allow a user with administrative privileges to remove a user from
         the list of admins in group.
 
@@ -272,59 +369,41 @@ class BaseUserGroupConfiguration(object):
         if not self.has_permission(request.user, group):
             return http.HttpResponseBadRequest()
 
+        extra_context = extra_context or None
+        extra_context.update({
+            'member': member,
+            'member_name': member.get_full_name() or member.username,
+        })
+
         if request.method != 'POST':
-            extra_context = { 'member': member }
-            return self.confirmation(request, group, 'revoke_admin',
+            return self.confirmation(request, 'revoke_admin', group, 
                                      extra_context)
 
         group.remove_admin(member)
 
         if request.is_ajax():
-            response = {
-                'message': 'Admin rights for user revoked',
-                'user_id': member.pk,
-            }
-            return http.HttpResponse(simplejson.dumps(json_response),
-                                mimetype='application/javascript')
+            data = { 'user_id': member.id }
+            return self.json_done(request, 'revoke_admin_done', data, group,
+                                  extra_context)
 
-        return http.HttpResponseRedirect(reverse('usergroups_group_detail',
-                                                 args=(self.slug, group.pk)))
+        url = reverse('usergroups_revoke_admin_done',
+                      args=(self.slug, group.pk, member.pk))
+        return http.HttpResponseRedirect(url)
 
-    @login_required
-    def leave_group(self, request, group_id, extra_context=None):
-        """Allow a user to leave a group. Also removes the user from the list
-        of admins if applicable.
-
-        Will return a JSON serialized dict if called with headers picked up by
-        ``is_ajax()``.
-
-        """
+    def revoke_admin_done(self, request, group_id, user_id,
+                          extra_context=None):
         group = get_object_or_404(self.model, pk=group_id)
+        member = get_object_or_404(User, pk=user_id)
 
-        if request.method != 'POST':
-            return self.confirmation(request, group, 'leave_group')
+        extra_context = extra_context or {}
+        extra_context.update({
+            'member': member,
+            'member_name': member.get_full_name() or member.username,
+        })
 
-        # TODO: We should have a "cannot leave group"-view for this situation.
-        if group.admins.count() == 1 and request.user in group.admins.all():
-            url = reverse('usergroups_delete_group',
-                          args=(self.slug, group.pk))
-            return http.HttpResponseRedirect(url)
+        return self.done(request, 'add_admin_done', group, extra_context)
 
-        group.remove_admin(request.user)
-        group.members.remove(request.user)
-
-        if request.is_ajax():
-            response = {
-                'message': 'You have left the group',
-                'user_id': request.user.id,
-            }
-            return http.HttpResponse(simplejson.dumps(json_response),
-                                     mimetype='application/javascript')
-
-        return http.HttpResponseRedirect(reverse('usergroups_group_detail',
-                                                 args=(self.slug, group.pk)))
-
-    # Invitations and applications
+    # Invitations
 
     @login_required
     def create_email_invitation(self, request, group_id, extra_context=None):
@@ -341,11 +420,19 @@ class BaseUserGroupConfiguration(object):
                                    data=request.POST or None)
         if form.is_valid():
             form.send_invitations(self.slug)
-            url = reverse('usergroups_group_detail', args=(self.slug, group.pk))
+            url = reverse('usergroups_email_invitation_done',
+                          args=(self.slug, group.pk))
             return http.HttpResponseRedirect(url)
 
-        return direct_to_template(request, extra_context=locals(),
-                                         template='usergroups/create_email_invitation.html')
+        extra_context = extra_context or {}
+        extra_context.update({
+            'form': form,
+            'group': group,
+        })
+
+        template_name = self.create_email_invitation_template_name
+        return direct_to_template(request, extra_context=extra_context,
+                                  template=template_name)
 
     @login_required
     def validate_email_invitation(self, request, group_id, key,
@@ -368,11 +455,54 @@ class BaseUserGroupConfiguration(object):
         return http.HttpResponseRedirect(reverse('usergroups_group_joined',
                                                  args=(self.slug, group.pk)))
 
+    # Applications
 
-    def group_joined(self, request, group_id, extra_context=None):
+    @login_required
+    def apply_to_join_group(self, request, group_id, extra_context=None):
+        """Allow a user to apply to join group.
+
+        Will return a JSON serialized dict if called with headers picked up by
+        ``is_ajax()``.
+
+        """
         group = get_object_or_404(self.model, pk=group_id)
-        return direct_to_template(request, extra_context=locals(),
-                                         template='usergroups/group_joined.html')
+
+        if request.method != 'POST':
+            return self.confirmation(request, 'apply_to_join', group, 
+                                     extra_context)
+
+        already_member = request.user in group.members.all()
+
+        if not already_member:
+            from django.contrib.contenttypes.models import ContentType
+            ctype = ContentType.objects.get_for_model(self.model)
+            (application, created) = \
+                UserGroupApplication.objects.get_or_create(user=request.user,
+                                                           content_type=ctype,
+                                                           object_id=group.pk)
+
+            if created and notification:
+                context = {
+                    'application': application,
+                    'group': group,
+                }
+                notification.send(group.admins.all(),
+                                  'usergroups_application', context)
+
+        extra_context = extra_context or {}
+        extra_context.update({
+            'group': group,
+            'already_member': already_member,
+        })
+
+        action = already_member and 'application_failed' or 'application_sent'
+
+        if request.is_ajax():
+            data = { 'already_member': already_member }
+            return self.json_done(request, action, data, group, extra_context)
+
+        return http.HttpResponseRedirect(reverse('usergroups_%s' % action,
+                                                 args=(self.slug, group.pk)))
 
     @login_required
     def approve_application(self, request, group_id, application_id,
@@ -386,42 +516,44 @@ class BaseUserGroupConfiguration(object):
         """
         group = get_object_or_404(self.model, pk=group_id)
         application = get_object_or_404(UserGroupApplication, pk=application_id)
+        applicant = application.user
 
         if not self.has_permission(request.user, group):
             return http.HttpResponseBadRequest()
 
+        extra_context = extra_context or {}
+        extra_context.update({
+            'applicant': applicant,
+            'applicant_name': applicant.get_full_name() or applicant.username,
+        })
+
         if request.method != 'POST':
-            extra_context = { 'application': application }
-            return self.confirmation(request, group, 'approve_application',
+            return self.confirmation(request, 'approve_application', group, 
                                      extra_context)
 
         group.members.add(application.user)
         application_id = application.id
-
-        applicant = application.user
-        context = {
-            'group': group,
-            'applicant': applicant,
-        }
-
         application.delete()
 
         if notification:
+            context = extra_context.copy()
+            context.update({
+                'group': group,
+            })
             notification.send([applicant], 'usergroups_application_approved',
                               context)
 
         if request.is_ajax():
-            response = {
-                'message': 'Application approved',
-                'user_id': application.user.id,
+            data = {
                 'application_id': application_id,
+                'user_id': applicant.id,
             }
-            return http.HttpResponse(simplejson.dumps(json_response),
-                                mimetype='application/javascript')
+            return self.json_done(request, 'application_approved', data,
+                                  extra_context)
 
-
-        return http.HttpResponseRedirect(reverse('usergroups_group_detail',
-                                                args=(self.slug, group.pk)))
+        url = reverse('usergroups_application_approved',
+                      args=(self.slug, group.pk))
+        return http.HttpResponseRedirect(url)
 
     @login_required
     def ignore_application(self, request, group_id, application_id,
@@ -435,76 +567,83 @@ class BaseUserGroupConfiguration(object):
         """
         group = get_object_or_404(self.model, pk=group_id)
         application = get_object_or_404(UserGroupApplication, pk=application_id)
+        applicant = application.user
 
         if not self.has_permission(request.user, group):
             return http.HttpResponseBadRequest()
 
+        extra_context = extra_context or {}
+        extra_context.update({
+            'applicant': applicant,
+            'applicant_name': applicant.get_full_name() or applicant.username,
+        })
+
         if request.method != 'POST':
-            extra_context = { 'application': application }
-            return self.confirmation(request, group, 'ignore_application',
+            return self.confirmation(request, 'ignore_application', group, 
                                      extra_context)
 
         application_id = application.pk
         application.delete()
 
         if request.is_ajax():
-            response = {
-                'message': 'Application ignored.',
-                'user_id': application.user.id,
-                'application_id': application_id,
-            }
-            return http.HttpResponse(simplejson.dumps(json_response),
-                                     mimetype='application/javascript')
+            return self.json_done(request, 'application_ignored', data,
+                                  group, extra_context)
 
-        return http.HttpResponseRedirect(reverse('usergroups_group_detail',
-                                                 args=(self.slug, group.pk)))
+        url = reverse('usergroups_application_ignored',
+                      args=(self.slug, group.pk))
+        return http.HttpResponseRedirect(url)
 
-    @login_required
-    def apply_to_join_group(self, request, group_id, extra_context=None):
-        """Allow a user to apply to join group.
+    # Helpers
 
-        Will return a JSON serialized dict if called with headers picked up by
-        ``is_ajax()``.
+    def confirmation(self, request, action, group, extra_context=None):
+        """Simple helper-view that should present the visitor with a form
+        that can be used to perform a POST-request when such is required
+        by the original view.
+
+        The ``action`` argument contains a string used to identify the
+        original view in the template (typically to generate sane
+        instructions).
 
         """
-        group = get_object_or_404(self.model, pk=group_id)
-
-        if request.method != 'POST':
-            return self.confirmation(request, group, extra_context)
-
-        already_member = request.user in group.members.all()
-        if not already_member:
-            try:
-                from django.contrib.contenttypes.models import ContentType
-                ctype = ContentType.objects.get_for_model(group)
-                application = UserGroupApplication.objects.get(user=request.user,
-                                                               content_type=ctype,
-                                                               object_id=group.pk)
-                application.created = datetime.datetime.now()
-                application.save()
-            except UserGroupApplication.DoesNotExist:
-                application = UserGroupApplication.objects.create(user=request.user,
-                                                                  group=group)
-                context = {
-                    'application': application,
-                    'group': group,
-                }
-                if notification:
-                    notification.send(group.admins.all(),
-                                      'usergroups_application', context)
-
-        extra_context = { 'group': group, 'already_member': already_member }
-
-        if request.is_ajax():
-            response = {
-                'message': already_member and 'You\'re already a member of group' or 'Application sent',
-                'already_member': already_member,
-            }
-            return http.HttpResponse(simplejson.dumps(json_response),
-                                     mimetype='application/javascript')
-
+        extra_context = extra_context or {}
+        extra_context.update({ 'group': group, 'action': action })
         return direct_to_template(request, extra_context=extra_context,
-                                         template='usergroups/application.html')
+                                  template=self.confirm_action_template_name)
+
+    def done(self, request, action, group=None, extra_context=None):
+        """Simple helper-view that should present the visitor with a message
+        letting him/her know that an action has been performed.
+
+        See ``BaseUserGroupConfiguration.confirmation()`` for information on
+        arguments.
+        
+        """
+        extra_context = extra_context or {}
+        extra_context.update({
+            'group': group,
+            'group_name': group.name,
+            'action': action,
+        })
+        return direct_to_template(request, extra_context=extra_context,
+                                  template=self.done_template_name)
+
+    def json_done(self, request, action, data=None, group=None,
+                  extra_context=None):
+        extra_context = extra_context or {}
+        extra_context.update({
+            'group': group,
+            'group_name': group.name,
+            'action': action,
+        })
+
+        data = data or {}
+        data.update({
+            'message': self.done_template_name[action] % extra_context,
+        })
+
+        return http.HttpResponse(simplejson.dumps(data, ensure_ascii=False),
+                                 mimetype='application/json')
+
 
 
 class ConfigurationAlreadyRegistered(Exception):

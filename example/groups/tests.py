@@ -122,7 +122,7 @@ True
 >>> r = post(c2, 'usergroups_apply_to_join', {},
 ...          { 'slug': 'test', 'group_id': g.pk })
 >>> r.status_code
-200
+302
 
 >>> application = UserGroupApplication.objects.get(pk=1)
 
@@ -139,7 +139,7 @@ True
 >>> r = post(c2, 'usergroups_apply_to_join', {},
 ...          { 'slug': 'test', 'group_id': g.pk })
 >>> r.status_code
-200
+302
 
 >>> application = UserGroupApplication.objects.get(pk=1)
 
