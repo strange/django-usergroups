@@ -597,10 +597,12 @@ class BaseUserGroupConfiguration(object):
 
     def render_helper(self, request, action, group, message, template_name,
                       extra_context=None):
+        """Setup a context common for confirmation- and done views,
+        interpolate `message` with said context and render `template_name`.
+
+        """
         extra_context = extra_context or {}
-        extra_context.update({
-            'action': action,
-        })
+        extra_context.update({ 'action': action })
         if group is not None:
             extra_context.update({
                 'group': group,
@@ -617,8 +619,7 @@ class BaseUserGroupConfiguration(object):
         by the original view.
 
         The ``action`` argument contains a string used to identify the
-        original view in the template (typically to generate sane
-        instructions).
+        original view (typically to generate sane instructions).
 
         """
         message = self.confirmation_messages[action]
