@@ -15,9 +15,6 @@ from usergroups.forms import EmailInvitationForm
 from usergroups.models import EmailInvitation
 from usergroups.models import UserGroupApplication
 
-# TODO: Template names as class vars.
-# TODO: Add "done"-views.
-
 if "notification" in settings.INSTALLED_APPS and \
    hasattr(settings, 'USERGROUPS_SEND_NOTIFICATIONS') and \
    settings.USERGROUPS_SEND_NOTIFICATIONS:
@@ -94,6 +91,9 @@ class BaseUserGroupConfiguration(object):
 
     def get_edit_group_form(self):
         return self.get_create_group_form()
+
+    def get_email_invitation_form(self):
+        return EmailInvitationForm
 
     # Views
 
@@ -416,8 +416,9 @@ class BaseUserGroupConfiguration(object):
         if not self.has_permission(request.user, group):
             return http.HttpResponseBadRequest()
 
-        form = EmailInvitationForm(user=request.user, group=group,
-                                   data=request.POST or None)
+        form_class = self.get_email_invitation_form()
+        form = form_class(user=request.user, group=group,
+                          data=request.POST or None)
         if form.is_valid():
             form.send_invitations(self.slug)
             url = reverse('usergroups_email_invitation_done',
