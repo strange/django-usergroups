@@ -2,6 +2,15 @@
 Django Usergroups
 =================
 
+Disclaimer
+==========
+
+This is a total rewrite of my ancient reusable group app. There are several
+kinks that I have not yet worked out. I will be modifying my old projects to
+support this application. There might be some backwards incompatible changes
+to this application as well (class-, module- and attribute name  changes,
+modified views, URL layout changes etc).
+
 Installation and configuration
 ==============================
 
@@ -38,3 +47,9 @@ You can override default behaviour and settings by extending
 And register the configuration::
 
     options.register('groups', MyGroup, MyConfig)
+
+Examples
+========
+
+There are some non-exhaustive examples in the application `example` located in
+the root directory of the repository.

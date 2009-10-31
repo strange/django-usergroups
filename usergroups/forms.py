@@ -28,13 +28,13 @@ class EmailInvitationForm(forms.Form):
         """Validate all e-mail addresses."""
         emails = self.parse_emails()
         if not emails:
-            raise forms.ValidationError((u"You haveto enter at-least one "
-                                         u"e-mail address."))
+            raise forms.ValidationError(u"You haveto enter at-least one "
+                                        u"e-mail address.")
         
         for email in emails:
             if not email_re.search(email):
-                raise forms.ValidationError((u"One or more e-mail addresses "
-                                             u"were not valid."))
+                raise forms.ValidationError(u"One or more e-mail addresses "
+                                            u"were not valid.")
         return emails
     
     def send_invitations(self, slug):
@@ -50,6 +50,7 @@ class EmailInvitationForm(forms.Form):
             invitation = EmailInvitation.objects.create(user=self.user,
                                                         group=self.group,
                                                         email=email)
+            # TODO: Move templates to config class.
             url = reverse('usergroups_validate_email_invitation',
                           args=(slug, self.group.pk, invitation.secret_key))
             full_url = 'http://%s%s' % (current_site.domain, url)
