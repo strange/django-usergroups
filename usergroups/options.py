@@ -81,8 +81,16 @@ class BaseUserGroupConfiguration(object):
         self.slug = slug
         self.model = model
 
+    _is_admin = {}
     def is_admin(self, user, group):
-        return user == group.creator or group.admins.filter(pk=user.pk)
+        """Return a boolean that indicates whether `user` has administrative
+        privileges in `group` or not.
+        
+        """
+        if not self._is_admin.has_key(user.pk):
+            self._is_admin[user.pk] = user == group.creator or \
+                group.admins.filter(pk=user.pk)
+        return self._is_admin[user.pk]
 
     # Forms
 
