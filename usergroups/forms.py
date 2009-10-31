@@ -19,19 +19,22 @@ class EmailInvitationForm(forms.Form):
         """Parse emails and return as a list."""
         if not hasattr(self, "_emails_cache"):
             emails = self.data.has_key("emails") and self.data["emails"] or ""
-            emails = emails.replace(',', ' ').replace('\n', ' ') # Remove linebreaks and commas
-            self._emails_cache = [e.strip() for e in emails.split(' ') if e.strip() != ""]
+            emails = emails.replace(',', ' ').replace('\n', ' ')
+            self._emails_cache = [e.strip() for e in emails.split(' ') \
+                                  if e.strip() != ""]
         return self._emails_cache
     
     def clean_emails(self):
         """Validate all e-mail addresses."""
         emails = self.parse_emails()
         if not emails:
-            raise forms.ValidationError("You haveto enter at-least one e-mail address.")
+            raise forms.ValidationError((u"You haveto enter at-least one "
+                                         u"e-mail address."))
         
         for email in emails:
             if not email_re.search(email):
-                raise forms.ValidationError("One or more e-mail addresses were not valid.")
+                raise forms.ValidationError((u"One or more e-mail addresses "
+                                             u"were not valid."))
         return emails
     
     def send_invitations(self, slug):
@@ -47,10 +50,9 @@ class EmailInvitationForm(forms.Form):
             invitation = EmailInvitation.objects.create(user=self.user,
                                                         group=self.group,
                                                         email=email)
-            url = 'http://%s%s' % (current_site.domain,
-                                   reverse('usergroups_validate_email_invitation',
-                                           args=(slug, self.group.pk,
-                                                 invitation.secret_key)))
+            url = reverse('usergroups_validate_email_invitation',
+                          args=(slug, self.group.pk, invitation.secret_key))
+            full_url = 'http://%s%s' % (current_site.domain, url)
             subject = render_to_string('usergroups/invitation_subject.txt', {
                 'user': self.user,
                 'site': current_site
@@ -60,6 +62,6 @@ class EmailInvitationForm(forms.Form):
                 'user': self.user,
                 'site': current_site,
                 'group': self.group,
-                'url': url,
+                'url': full_url,
             })
             send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
