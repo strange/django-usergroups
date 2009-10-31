@@ -2,6 +2,9 @@
 Django Usergroups
 =================
 
+A simple application that adds basic, albeit extensible, functionality to
+manage groups of users in a project.
+
 Disclaimer
 ==========
 
@@ -9,7 +12,7 @@ This is a total rewrite of my ancient reusable group app. There are several
 kinks that I have not yet worked out. I will be modifying my old projects to
 support this application. There might be some backwards incompatible changes
 to this application as well (class-, module- and attribute name  changes,
-modified views, URL layout changes etc).
+modified views, URL layout changes, improved way to register configs etc).
 
 Installation and configuration
 ==============================
