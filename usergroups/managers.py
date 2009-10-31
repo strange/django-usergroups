@@ -1,6 +1,6 @@
 from django.db import models
 
-class UserGroupInvitationManager(models.Manager):
+class EmailInvitationManager(models.Manager):
     def handle_invite(self, user, group, secret_key):
         """Validate invitation key and add user to the group specified in the
         invitation. Return boolean stating whether the invitation was valid
@@ -8,7 +8,7 @@ class UserGroupInvitationManager(models.Manager):
         
         """
         try:
-            invitation = self.get(user=user, secret_key=secret_key)
+            invitation = self.get(secret_key=secret_key)
             group.members.add(user)
             invitation.delete()
             return True

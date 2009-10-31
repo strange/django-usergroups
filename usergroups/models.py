@@ -1,16 +1,13 @@
 import datetime
-import random
 import hashlib
+import random
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes import generic
 from django.contrib.contenttypes.models import ContentType
-from django.core.urlresolvers import reverse
 from django.db import models
-from django.db.models import get_model
 
-from usergroups.managers import UserGroupInvitationManager
+from usergroups.managers import EmailInvitationManager
 
 class BaseUserGroup(models.Model):
     """An abstract base class for a group of people; an association."""
@@ -77,7 +74,7 @@ class EmailInvitation(BaseGroupRelation):
     secret_key = models.CharField(max_length=30)
     created = models.DateTimeField(default=datetime.datetime.now)
     
-    objects = UserGroupInvitationManager()
+    objects = EmailInvitationManager()
     
     def generate_secret_key(self):
         """Generate a secret key."""

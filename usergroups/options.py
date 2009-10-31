@@ -459,19 +459,11 @@ class BaseUserGroupConfiguration(object):
         """Allow a user to Validate an ``EmailInvitation``."""
         group = get_object_or_404(self.model, pk=group_id)
 
-        try:
-            # TODO: Search on group as well.
-            invitation = EmailInvitation.objects.get(secret_key=key)
-            invitation.delete()
-        except EmailInvitation.DoesNotExist:
+        valid = EmailInvitation.objects.handle_invite(request.user,
+                                                      group, key)
+        if not valid:
             template_name = self.invalid_invitation_template_name
-            return direct_to_template(request,
-                                      template=template_name)
-        except EmailInvitation.MultipleObjectsReturned:
-            invitations = EmailInvitation.objects.filter(secret_key=key)
-            invitations.delete()
-
-        group.members.add(request.user)
+            return direct_to_template(request, template=template_name)
 
         return http.HttpResponseRedirect(reverse('usergroups_group_joined',
                                                  args=(self.slug, group.pk)))
