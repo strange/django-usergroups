@@ -5,9 +5,8 @@ TEMPLATE_DEBUG = DEBUG
 DEBUG_PROPAGATE_EXCEPTIONS = DEBUG
  
 DATABASE_ENGINE = 'sqlite3'
-#DATABASE_NAME = ':memory:'
-DATABASE_NAME = '/Users/gs/Desktop/test.db'
-   
+DATABASE_NAME = ':memory:'
+
 TIME_ZONE = 'UTC'
     
 SITE_ID = 1
